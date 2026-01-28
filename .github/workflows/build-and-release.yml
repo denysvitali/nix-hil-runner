@@ -1,0 +1,57 @@
+name: Build and Release SD Image
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v21
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y xz-utils
+
+      - name: Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+
+      - name: Configure Nix substituters
+        run: |
+          mkdir -p ~/.config/nix
+          echo "extra-substituters = https://nix-community.cachix.org https://cache.nixos.org" >> ~/.config/nix/nix.conf
+          echo "extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" >> ~/.config/nix/nix.conf
+
+      - name: Build SD Image (native ARM64 build)
+        run: nix build .#packages.aarch64-linux.pi4-sd-image -L
+
+      - name: Rename image for release
+        run: |
+          mkdir -p output
+          cp -L result/sd-image/*.img* output/
+
+      - name: Upload Image Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: pi4-sd-image
+          path: output/*
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: output/*
+          generate_release_notes: true
