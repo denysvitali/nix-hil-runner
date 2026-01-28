@@ -1,16 +1,16 @@
-# NixOS Raspberry Pi 4 Smoke Test Image
+# NixOS Raspberry Pi 4 - GPS Tracker Runner
 
-Reproducible, updatable NixOS SD image for Raspberry Pi 4 with GitHub Actions self-hosted runner.
+Reproducible, updatable NixOS SD image for Raspberry Pi 4 with GitHub Actions self-hosted runner for the [gps-tracker-tr003-v2](https://github.com/denysvitali/gps-tracker-tr003-v2) project.
 
 ## Features
 
 - **NixOS unstable** (rolling release)
 - **Immutable rootfs** via NixOS generation system
 - **Atomic remote upgrades** via SSH with native rollback
-- **CI Tools**: probe-rs, cargo, espflash
-- **GitHub Actions** self-hosted runner (`pi4-smoke-test`)
+- **CI Tools**: probe-rs, cargo, espflash, rustc
+- **GitHub Actions** self-hosted runner (pre-configured)
 - **Aarch64 emulation** support for x86_64 build machines
-- **TUI-based first-boot setup** for easy configuration
+- **Modular configuration** for easy customization
 
 ## Architecture
 
@@ -22,16 +22,16 @@ No A/B partitioning needed - NixOS provides "A/B-like" behavior through its **ge
 ## Directory Structure
 
 ```
-nix-hil-rpi/
+nix-hil-runner/
 ├── flake.nix                 # Flake inputs and outputs
 ├── hosts/
 │   └── pi4/
 │       ├── configuration.nix  # Main system config
 │       └── hardware.nix       # Pi 4 specific hardware
-├── pkgs/
-│   └── setup-tool/            # TUI-based first-boot setup tool
-│       ├── default.nix        # Package definition
-│       └── setup-tool.py      # Setup tool implementation
+├── modules/
+│   ├── github-runner.nix     # GitHub Actions runner module
+│   ├── ci-tools.nix          # CI/Embedded development tools
+│   └── base-packages.nix     # Base system packages
 └── README.md                 # This file
 ```
 
@@ -47,7 +47,7 @@ nix-hil-rpi/
 
 ```bash
 # Build the SD image
-nix build .#nixosConfigurations.pi4.config.system.build.sdImage
+nix build .#pi4-sd-image
 
 # Result is in result/sd-image/nixos.img
 ```
@@ -55,7 +55,7 @@ nix build .#nixosConfigurations.pi4.config.system.build.sdImage
 ### On Native ARM
 
 ```bash
-nix build .#sdImage
+nix build .#pi4-sd-image
 ```
 
 ## Flashing the SD Card
@@ -71,106 +71,52 @@ sudo dd if=result/sd-image/nixos.img of=/dev/sdX bs=1M status=progress conv=fsyn
 sudo bmaptool copy result/sd-image/nixos.img /dev/sdX
 ```
 
-## First Boot Setup
+## Initial Setup
 
-When you boot the Raspberry Pi for the first time, an interactive TUI setup tool will automatically appear on `tty1` (the main console). This tool configures the essential settings needed before the system is fully operational.
+### Step 1: Add Your SSH Keys
 
-### Default Login Credentials
+Before flashing, edit `hosts/pi4/configuration.nix` and add your SSH public key:
 
-For the first boot only, you can log in via console or SSH using:
-- **Username**: `pi`
-- **Password**: `nixos`
-
-> ⚠️ **Important**: These credentials are temporary and only work until the setup tool completes. SSH password authentication will be **disabled** after setup finishes.
-
-### The TUI Setup Tool
-
-The setup tool runs automatically on first boot and guides you through configuration:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│     🍓 NixOS Raspberry Pi 4 Post-Boot Configuration Tool 🍓     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-
-Welcome! This tool will help you configure your NixOS Raspberry Pi.
-
-Required Configuration:
-  • SSH Authorized Keys (enables SSH access)
-  • GitHub Actions Runner Token
-  • GitHub Actions Runner URL
-
-Optional Configuration:
-  • Hostname (default: pi4-smoke-test)
-  • Timezone (default: UTC)
-  • WiFi Credentials (if WiFi interface detected)
-
-Press Start to begin the configuration process.
+```nix
+users.users.pi.openssh.authorizedKeys.keys = [
+  "ssh-ed25519 AAAAC3Nza... your-public-key-here"
+];
 ```
 
-### What Gets Configured
+Then rebuild the image with your changes:
 
-The setup tool will configure:
-
-1. **SSH Keys** (required) - Choose one of:
-   - Fetch from GitHub username
-   - Paste public key directly
-   - Load from USB/SD card file
-
-2. **GitHub Actions Runner** (required):
-   - Runner token (PAT with `repo` scope)
-   - Runner URL (default: this repo)
-
-3. **System Settings** (optional):
-   - Hostname (default: `pi4-smoke-test`)
-   - Timezone (default: `UTC`)
-   - WiFi credentials (if WiFi detected)
-
-4. **Final Application**:
-   - Runs `nixos-rebuild switch` to apply all changes
-   - Disables SSH password authentication
-   - Creates completion flag to prevent re-running
-
-### After Setup Completes
-
-Once the setup tool finishes:
-- ✅ SSH key-based authentication is enabled
-- ✅ SSH password authentication is **disabled**
-- ✅ GitHub Actions runner is configured and will start
-- ✅ System hostname and timezone are set
-- ✅ WiFi is configured (if provided)
-
-You can now SSH into the Pi using your configured key:
 ```bash
-ssh pi@pi4-smoke-test.local
+nix build .#pi4-sd-image
 ```
 
-## Initial Boot
+### Step 2: Boot and Configure Runner Token
 
 1. Insert SD card and power on the Pi
-2. Wait for boot (LED pattern: rapid blinking → solid)
-3. The TUI setup tool appears automatically on `tty1`
-4. Complete the setup using either:
-   - **Direct console**: Use a keyboard and monitor connected to the Pi
-   - **SSH**: Find the Pi's IP and SSH in with the temporary credentials
-
-### Finding the Pi's IP Address
+2. SSH into the Pi: `ssh pi@pi4-gps-tracker.local` (find the IP via your router)
+3. Add your GitHub runner token:
 
 ```bash
-# Using mDNS
-avahi-resolve -n pi4-smoke-test.local
+# Edit the token file (replace with your actual token)
+echo -n "YOUR_GITHUB_PAT_TOKEN" | sudo tee /var/lib/github-runner/.token
 
-# Or check your router's DHCP lease table
+# Restart the runner service
+sudo systemctl restart github-runner-pi4.service
 ```
 
-### Post-Setup SSH Access
+### Getting the Runner Token
 
-After the setup tool completes, **only key-based SSH authentication works**. The temporary password `nixos` will no longer function for SSH.
+1. Go to https://github.com/denysvitali/gps-tracker-tr003-v2/settings/actions/runners/new
+2. Click "New self-hosted runner"
+3. Copy the token (not the entire command, just the token)
+
+### Verify Runner is Running
 
 ```bash
-# SSH using your configured key
-ssh pi@<IP>
+# Check runner status
+sudo systemctl status github-runner-pi4.service
+
+# View logs
+sudo journalctl -u github-runner-pi4.service -f
 ```
 
 ## Remote Upgrades
@@ -178,7 +124,7 @@ ssh pi@<IP>
 From your workstation (requires SSH access):
 
 ```bash
-nixos-rebuild switch --flake .#pi4 \
+nixos-rebuild switch --flake .#pi4-aarch64 \
   --target-host pi@<PI_IP> \
   --use-remote-sudo
 ```
@@ -189,149 +135,47 @@ This will:
 3. Atomically activate new generation
 4. Keep old generation for rollback
 
-## In-Place Upgrades
+## Updating the System
 
-Once NixOS is running on the Raspberry Pi, you can perform upgrades directly on the device or from a remote machine.
-
-### Updating the System
-
-#### 1. Update Flake Inputs
+### 1. Update Flake Inputs
 
 This updates `nixpkgs` and other inputs to their latest versions:
 
 ```bash
-# On the Pi or your workstation
-cd /etc/nixos  # or wherever your flake is
+# On your workstation
+cd /path/to/nix-hil-runner
 nix flake update
 ```
 
-#### 2. Rebuild with New Configuration
+### 2. Rebuild with New Configuration
 
 Apply the updated inputs or local config changes:
 
 ```bash
-# On the Pi (in-place upgrade)
-sudo nixos-rebuild switch --flake .#pi4-aarch64
-
-# Or from a remote machine
+# Remote deployment
 nixos-rebuild switch --flake .#pi4-aarch64 \
-  --target-host pi@<PI_IP> \
+  --target-host pi@pi4-gps-tracker.local \
   --use-remote-sudo
 ```
-
-### Understanding Upgrade Types
-
-| Command | What It Does |
-|---------|--------------|
-| `nix flake update` | Updates `flake.lock` with latest `nixpkgs` and inputs |
-| `nixos-rebuild switch --flake .#pi4-aarch64` | Builds and activates configuration using current `flake.lock` |
-| `git pull && nixos-rebuild switch ...` | Updates configuration from git, then rebuilds |
-
-- **Updating flake inputs**: Gets newer versions of NixOS packages
-- **Rebuilding with local changes**: Applies your modified configuration
-- **Upgrading from git**: Combines `git pull` with rebuild to get both new config and packages
 
 ### Rollback if Something Breaks
 
 If an upgrade causes issues, rollback to the previous generation:
 
 ```bash
-# Rollback to the previous generation
+# On the Pi
 sudo nixos-rebuild switch --rollback
-
-# Or at boot time (via serial console or monitor):
-# At boot menu, select "NixOS - Boot options" → previous generation
-```
-
-### Cleaning Up Old Generations
-
-After confirming everything works, clean up old generations to free disk space:
-
-```bash
-# Delete all old generations (keeps current only)
-nix-collect-garbage -d
-
-# Or delete generations older than 30 days
-sudo nix-collect-garbage --delete-older-than 30d
-```
-
-> ⚠️ **Note**: Be careful with garbage collection if you might need to rollback. Old generations provide your safety net.
-
-### Complete Remote Upgrade Example
-
-From your workstation, updating everything:
-
-```bash
-# 1. Navigate to your flake repository
-cd ~/projects/nix-hil-rpi
-
-# 2. Pull latest configuration changes
-git pull origin main
-
-# 3. Update nixpkgs to latest
-nix flake update
-
-# 4. Deploy to Pi (builds locally, transfers, activates)
-nixos-rebuild switch --flake .#pi4-aarch64 \
-  --target-host pi@pi4-smoke-test.local \
-  --use-remote-sudo
-
-# 5. Verify the upgrade
-ssh pi@pi4-smoke-test.local "sudo nixos-rebuild list-generations"
-```
-
-## Manual Setup Tool Usage
-
-Normally, the setup tool runs automatically on first boot. However, you can also run it manually if needed.
-
-### Running the Setup Tool
-
-```bash
-# Run the setup tool manually
-sudo setup-tool
-```
-
-### Setup Completion Flag
-
-The setup tool creates a flag file to prevent automatic re-running:
-
-```bash
-# Check if setup has completed
-cat /var/lib/.nixos-setup-complete
-```
-
-If this file exists, the systemd service will not start the setup tool automatically on boot.
-
-### Resetting the Setup Tool
-
-To run the setup tool again on next boot:
-
-```bash
-# Remove the completion flag
-sudo rm /var/lib/.nixos-setup-complete
-
-# Reboot to trigger the setup service
-sudo reboot
-```
-
-Alternatively, you can run it immediately without rebooting:
-
-```bash
-# Remove flag and run manually
-sudo rm /var/lib/.nixos-setup-complete
-sudo setup-tool
 ```
 
 ## Persistence
 
 These paths survive `nixos-rebuild`:
 
-- `/var/lib/github-runner/` - Runner data + token
-- `/var/lib/.nixos-setup-complete` - Setup completion flag
-- `/etc/nixos/` - Symlink to your git repo (optional)
+- `/var/lib/github-runner/` - Runner data + token (persistent)
 - `/home/pi/` - User files
 - `/root/` - Root files
-- `/home/pi/.ssh/` - SSH keys and authorized_keys
+
+The runner token file (`/var/lib/github-runner/.token`) persists across system updates.
 
 ## Installed Packages
 
@@ -339,57 +183,40 @@ These paths survive `nixos-rebuild`:
 |---------|-------------|
 | `probe-rs` | JTAG/SWD debugger |
 | `espflash` | Espressif chip flasher |
-| `cargo` | Rust package manager |
-| `rustc` | Rust compiler |
+| `cargo`, `rustc`, `rustfmt`, `clippy` | Rust toolchain |
 | `git` | Version control |
-| `nano` | Simple editor |
+| `vim`, `nano` | Text editors |
 | `htop` | Process viewer |
-| `setup-tool` | TUI first-boot configuration |
 
 ## Troubleshooting
 
-### Setup tool didn't appear
+### Can't SSH after first boot
 
-- Check that you're on `tty1` (press `Alt+F1` if on another console)
-- Check the service status: `sudo systemctl status nixos-first-boot-setup`
-- Run manually: `sudo setup-tool`
-- Check for the completion flag: `ls -la /var/lib/.nixos-setup-complete`
-
-### Can't SSH after setup
-
-- Ensure you configured SSH keys in the setup tool
-- Check the authorized_keys file: `cat /home/pi/.ssh/authorized_keys`
+- Ensure you added your SSH key before building the image
+- Check the authorized_keys file: `cat ~/.ssh/authorized_keys`
 - Verify SSH service is running: `sudo systemctl status sshd`
-- Check SSH is using key auth (password auth is disabled after setup)
-
-### Forgot to set GitHub runner token
-
-- **Option 1**: Re-run the setup tool:
-  ```bash
-  sudo setup-tool
-  ```
-- **Option 2**: Edit files directly:
-  ```bash
-  # Create token file
-  echo "YOUR_GITHUB_PAT" | sudo tee /var/lib/github-runner/.runner_token > /dev/null
-  sudo chown github-runner:github-runner /var/lib/github-runner/.runner_token
-  sudo chmod 600 /var/lib/github-runner/.runner_token
-  
-  # Restart the runner service
-  sudo systemctl restart github-runner-pi4-smoke-test.service
-  ```
 
 ### Runner not starting
 
 ```bash
 # Check runner status
-sudo systemctl status github-runner-pi4-smoke-test.service
+sudo systemctl status github-runner-pi4.service
 
 # View logs
-sudo journalctl -u github-runner-pi4-smoke-test.service -f
+sudo journalctl -u github-runner-pi4.service -f
 
 # Check if token file exists
-ls -la /var/lib/github-runner/.runner_token
+cat /var/lib/github-runner/.token
+```
+
+### Runner needs new token
+
+Tokens expire after a certain time. To update:
+
+```bash
+# Get a new token from GitHub Actions settings
+echo -n "NEW_TOKEN" | sudo tee /var/lib/github-runner/.token
+sudo systemctl restart github-runner-pi4.service
 ```
 
 ### Build fails with "unsupported platform"
@@ -398,16 +225,45 @@ Ensure you're not cross-compiling without emulation:
 
 ```bash
 # On x86_64, ensure binfmt is registered
-sudo systemctl start binfmt-support
+sudo systemctl restart systemd-binfmt.service
 ```
 
-### Pi won't boot
+## Customization
 
-1. Verify SD card is formatted as MBR (not GPT)
-2. Check LED status:
-   - No light: Power issue
-   - 3 flashes: SD card not found
-   - 4 flashes: Kernel not found
+### Adding System Packages
+
+Edit `modules/base-packages.nix`:
+
+```nix
+{ config, pkgs, ... }:
+{
+  config.environment.systemPackages = with pkgs; [
+    git
+    nano
+    htop
+    curl
+    wget
+    vim
+    # Add your packages here
+  ];
+}
+```
+
+### Changing Hostname
+
+Edit `hosts/pi4/configuration.nix`:
+
+```nix
+networking.hostName = "your-hostname";
+```
+
+### Disabling the GitHub Runner
+
+Edit `hosts/pi4/configuration.nix`:
+
+```nix
+services.github-runners.pi4.enable = false;
+```
 
 ## References
 
