@@ -4,7 +4,7 @@ let
   # Fetch SSH keys from GitHub at build time
   denysvitaliKeys = pkgs.fetchurl {
     url = "https://github.com/denysvitali.keys";
-    hash = "sha256-DA6Xl/dMLPZa+Vx3+zpQTPns9S7W7RRNVEvfR8S/yBk=";
+    hash = "sha256-iPKudhKCi04zvyPghhb4+TrT2di7HLIMjmslI+S4/bM=";
   };
 in
 {
