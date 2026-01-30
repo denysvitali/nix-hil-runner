@@ -19,6 +19,9 @@
     "d /var/lib/github-runner 0755 github-runner github-runner - -"
   ];
 
+  # Add plugdev group to the runner service for USB device access
+  config.systemd.services.github-runner-pi4.serviceConfig.SupplementaryGroups = [ "plugdev" ];
+
   # Create a skeleton token file if it doesn't exist (with instructions)
   config.systemd.services.github-runner-pi4 = {
     preStart = lib.mkAfter ''
