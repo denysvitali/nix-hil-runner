@@ -14,8 +14,14 @@
   ];
 
   # ============== USB/Probe Device Permissions ==============
-  # Create plugdev group for USB device access
-  config.users.groups.plugdev = { };
+  # Create plugdev group for USB device access (system group for systemd 258+ compatibility)
+  config.users.groups.plugdev = {
+    isSystemGroup = true;
+  };
+
+  # Add empty file with "probe-rs" in name to satisfy probe-rs detection
+  # probe-rs checks for any file with "probe-rs" in the name at /etc/udev/rules.d/
+  config.environment.etc."udev/rules.d/99-probe-rs.rules".text = "";
 
   # Create github-runner user for the GitHub Actions runner service
   config.users.groups.github-runner = { };
