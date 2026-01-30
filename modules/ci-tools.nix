@@ -17,8 +17,13 @@
   # Create plugdev group for USB device access
   config.users.groups.plugdev = { };
 
-  # Add github-runner user to plugdev group for USB device access
-  config.users.users.github-runner.extraGroups = [ "plugdev" ];
+  # Create github-runner user for the GitHub Actions runner service
+  config.users.groups.github-runner = { };
+  config.users.users.github-runner = {
+    isSystemUser = true;
+    group = "github-runner";
+    extraGroups = [ "plugdev" ];
+  };
 
   # Udev rules for probe-rs compatible debug probes
   # Using environment.etc to place rules directly in /etc/udev/rules.d/
