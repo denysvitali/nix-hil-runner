@@ -20,7 +20,11 @@
   ];
 
   # Add plugdev group to the runner service for USB device access
-  config.systemd.services.github-runner-pi4.serviceConfig.SupplementaryGroups = [ "plugdev" ];
+  # Set USER env var so probe-rs can detect group membership (it runs `id -Gn $USER`)
+  config.systemd.services.github-runner-pi4.serviceConfig = {
+    SupplementaryGroups = [ "plugdev" ];
+    Environment = [ "USER=github-runner" ];
+  };
 
   # Create a skeleton token file if it doesn't exist (with instructions)
   config.systemd.services.github-runner-pi4 = {
