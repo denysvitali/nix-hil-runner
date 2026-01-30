@@ -23,6 +23,9 @@
     firewall.allowedTCPPorts = [ 22 ];  # SSH
   };
 
+  # Add pi user to plugdev/dialout for probe-rs access
+  users.users.pi.extraGroups = [ "plugdev" "dialout" ];
+
   # ============== System Settings ==============
   time.timeZone = "UTC";
   i18n.defaultLocale = "en_US.UTF-8";

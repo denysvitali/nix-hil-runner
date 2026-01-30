@@ -49,9 +49,10 @@
     SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0666", GROUP="dialout"
 
     # ESP JTAG - Unbind cdc_acm driver from interfaces to allow probe-rs libusb access
-    # Sleep required: Linux 4.12+ fires ADD before driver probe completes (race condition)
-    ACTION=="add", SUBSYSTEM=="usb", DRIVER=="cdc_acm", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", \
-      RUN+="${pkgs.bash}/bin/sh -c 'sleep 0.5; echo -n %k > /sys/bus/usb/drivers/cdc_acm/unbind 2>/dev/null || true'"
+    # Use "bind" action (not "add") - fires after driver has fully bound to the interface
+    # Also set driver_override to prevent cdc_acm from re-binding
+    ACTION=="bind", SUBSYSTEM=="usb", DRIVER=="cdc_acm", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", \
+      RUN+="${pkgs.bash}/bin/sh -c 'echo %k > /sys/bus/usb/drivers/cdc_acm/unbind; echo > /sys/bus/usb/devices/%k/driver_override'"
 
     # FTDI (FT2232, FT4232, FT232H)
     SUBSYSTEM=="usb", ATTR{idVendor}=="0403", MODE="0666", GROUP="plugdev"

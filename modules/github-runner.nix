@@ -24,6 +24,9 @@
   config.systemd.services.github-runner-pi4.serviceConfig = {
     SupplementaryGroups = [ "plugdev" "dialout" ];
     Environment = [ "USER=github-runner" ];
+    
+    # Allow access to hardware devices (USB probes)
+    PrivateDevices = false;
   };
 
   # Create a skeleton token file if it doesn't exist (with instructions)
