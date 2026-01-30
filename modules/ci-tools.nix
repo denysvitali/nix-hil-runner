@@ -1,5 +1,5 @@
 # CI/Embedded Development Tools
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 {
   config.environment.systemPackages = with pkgs; [
     # Embedded development tools
@@ -20,11 +20,10 @@
 
   # Add empty file with "probe-rs" in name to satisfy probe-rs detection
   # probe-rs checks for any file with "probe-rs" in the name at /etc/udev/rules.d/
-  # Using activation script since environment.etc can't create files in this directory
-  config.system.activationScripts.probe-rs-udev-rules = ''
-    mkdir -p /etc/udev/rules.d
-    touch /etc/udev/rules.d/99-probe-rs.rules
-  '';
+  # Create a derivation with the empty file and add it to udev packages
+  config.services.udev.packages = lib.mkBefore [
+    (pkgs.writeTextDir "etc/udev/rules.d/99-probe-rs.rules" "")
+  ];
 
   # Create github-runner user for the GitHub Actions runner service
   config.users.groups.github-runner = { };
