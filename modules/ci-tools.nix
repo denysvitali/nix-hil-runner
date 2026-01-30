@@ -26,6 +26,12 @@
     extraGroups = [ "plugdev" "dialout" ];
   };
 
+  # Add empty file with "probe-rs" in name to satisfy probe-rs detection
+  # probe-rs checks for any file with "probe-rs" in the name at /etc/udev/rules.d/
+  config.services.udev.packages = [
+    (pkgs.writeTextDir "etc/udev/rules.d/99-probe-rs.rules" "")
+  ];
+
   # Udev rules for probe-rs compatible debug probes
   config.services.udev.extraRules = ''
     # CMSIS-DAP compatible adapters
@@ -42,10 +48,10 @@
     # ESP JTAG - TTY/ACM serial interface
     SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", MODE="0666", GROUP="dialout"
 
-    # ESP JTAG - Unbind cdc_acm driver from interfaces 0 and 1 to allow probe-rs libusb access
-    # cdc_acm binds to interfaces (e.g., 1-1.3:1.0), not the device, so we must match at interface level
+    # ESP JTAG - Unbind cdc_acm driver from interfaces to allow probe-rs libusb access
+    # Sleep required: Linux 4.12+ fires ADD before driver probe completes (race condition)
     ACTION=="add", SUBSYSTEM=="usb", DRIVER=="cdc_acm", ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", \
-      RUN+="${pkgs.bash}/bin/sh -c 'echo -n %k > /sys/bus/usb/drivers/cdc_acm/unbind 2>/dev/null || true'"
+      RUN+="${pkgs.bash}/bin/sh -c 'sleep 0.5; echo -n %k > /sys/bus/usb/drivers/cdc_acm/unbind 2>/dev/null || true'"
 
     # FTDI (FT2232, FT4232, FT232H)
     SUBSYSTEM=="usb", ATTR{idVendor}=="0403", MODE="0666", GROUP="plugdev"
