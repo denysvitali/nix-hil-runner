@@ -20,7 +20,11 @@
 
   # Add empty file with "probe-rs" in name to satisfy probe-rs detection
   # probe-rs checks for any file with "probe-rs" in the name at /etc/udev/rules.d/
-  config.environment.etc."udev/rules.d/99-probe-rs.rules".text = "";
+  # Using activation script since environment.etc can't create files in this directory
+  config.system.activationScripts.probe-rs-udev-rules = ''
+    mkdir -p /etc/udev/rules.d
+    touch /etc/udev/rules.d/99-probe-rs.rules
+  '';
 
   # Create github-runner user for the GitHub Actions runner service
   config.users.groups.github-runner = { };
