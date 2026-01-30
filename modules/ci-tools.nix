@@ -26,9 +26,7 @@
   };
 
   # Udev rules for probe-rs compatible debug probes
-  # Using environment.etc to place rules directly in /etc/udev/rules.d/
-  # This satisfies both udev and probe-rs's detection logic
-  config.environment.etc."udev/rules.d/69-probe-rs.rules".text = ''
+  config.services.udev.extraRules = ''
     # CMSIS-DAP compatible adapters
     SUBSYSTEM=="usb", ATTR{idVendor}=="0d28", MODE="0666", GROUP="plugdev"
     SUBSYSTEM=="usb", ATTR{idVendor}=="0d28", ENV{ID_MM_DEVICE_IGNORE}="1"
