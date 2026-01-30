@@ -22,7 +22,7 @@
   # Add plugdev group to the runner service for USB device access
   # Set USER env var so probe-rs can detect group membership (it runs `id -Gn $USER`)
   config.systemd.services.github-runner-pi4.serviceConfig = {
-    SupplementaryGroups = [ "plugdev" ];
+    SupplementaryGroups = [ "plugdev" "dialout" ];
     Environment = [ "USER=github-runner" ];
   };
 
