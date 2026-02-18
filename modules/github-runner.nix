@@ -10,7 +10,7 @@
       "aarch64"
       "nixos"
     ];
-    url = "https://github.com/denysvitali/gps-tracker-tr003-v2";
+    url = "https://github.com/denysvitali/gps-tracker";
     tokenFile = "/var/lib/github-runner/.token";
   };
 
