@@ -4,8 +4,8 @@
   config.services.github-runners.pi4 = {
     enable = true;
     name = "pi4-gps-tracker";
+    noDefaultLabels = true;
     extraLabels = [
-      "self-hosted"
       "pi4"
       "aarch64"
       "nixos"
