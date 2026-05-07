@@ -17,14 +17,7 @@
   # Create plugdev group for USB device access
   # NixOS auto-assigns GIDs; leaving empty lets it assign from system range (< 1000)
   config.users.groups.plugdev = { };
-
-  # Create github-runner user for the GitHub Actions runner service
-  config.users.groups.github-runner = { };
-  config.users.users.github-runner = {
-    isSystemUser = true;
-    group = "github-runner";
-    extraGroups = [ "plugdev" "dialout" ];
-  };
+  # github-runner user/group is declared in modules/runner.nix
 
   # Add empty file with "probe-rs" in name to satisfy probe-rs detection
   # probe-rs checks for any file with "probe-rs" in the name at /etc/udev/rules.d/

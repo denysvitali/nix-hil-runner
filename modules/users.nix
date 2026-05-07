@@ -1,18 +1,17 @@
 { config, lib, ... }:
-let
-  cfg = config.hil;
-in
 {
   services.openssh = {
     enable = true;
     settings = {
-      PermitRootLogin = "prohibit-password";
-      PasswordAuthentication = false;
+      PermitRootLogin = lib.mkDefault "prohibit-password";
+      PasswordAuthentication = lib.mkDefault false;
     };
     authorizedKeysFiles = lib.mkForce [ "/etc/ssh/authorized_keys.d/%u" ];
   };
 
-  users.users.${cfg.user} = {
+  users.mutableUsers = true;
+
+  users.users.hil = {
     isNormalUser = true;
     description = "HIL runner user";
     extraGroups = [ "wheel" "networkmanager" "plugdev" "dialout" ];

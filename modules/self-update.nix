@@ -1,53 +1,64 @@
 { config, lib, pkgs, ... }:
 let
-  cfg = config.hil.selfUpdate;
+  defaultRepoUrl = "https://github.com/denysvitali/nix-hil-runner.git";
+  defaultBranch = "master";
+  defaultFlakeAttr = "pi4-aarch64";
   repoDir = "/var/lib/nix-hil-runner";
+
+  updateScript = pkgs.writeShellScript "hil-self-update" ''
+    set -euo pipefail
+
+    repo_url=${defaultRepoUrl}
+    branch=${defaultBranch}
+    attr=${defaultFlakeAttr}
+
+    # Optional override file on the perm partition: /perm/self-update.env
+    # may set REPO_URL, BRANCH, FLAKE_ATTR.
+    if [ -f /perm/self-update.env ]; then
+      # shellcheck disable=SC1091
+      . /perm/self-update.env
+      repo_url="''${REPO_URL:-$repo_url}"
+      branch="''${BRANCH:-$branch}"
+      attr="''${FLAKE_ATTR:-$attr}"
+    fi
+
+    if [ ! -d ${repoDir}/.git ]; then
+      rm -rf ${repoDir}.tmp
+      ${pkgs.git}/bin/git clone --depth 1 --branch "$branch" "$repo_url" ${repoDir}.tmp
+      rm -rf ${repoDir}
+      mv ${repoDir}.tmp ${repoDir}
+    fi
+
+    ${pkgs.git}/bin/git -C ${repoDir} fetch --prune origin "$branch"
+    ${pkgs.git}/bin/git -C ${repoDir} checkout -B "$branch" "origin/$branch"
+    ${pkgs.git}/bin/git -C ${repoDir} submodule update --init --recursive
+
+    ${pkgs.nix}/bin/nix flake update --flake ${repoDir}
+    ${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --flake ${repoDir}#"$attr"
+  '';
 in
-lib.mkIf cfg.enable {
-  systemd.services.nix-hil-runner-self-update = {
-    description = "Update nix-hil-runner checkout and switch to latest NixOS generation";
+{
+  systemd.services.hil-self-update = {
+    description = "Pull nix-hil-runner upstream and switch to the latest generation";
+    # Don't try to self-update before the device is configured.
+    unitConfig.ConditionPathExists = "/perm/configured";
     wants = [ "network-online.target" ];
     after = [ "network-online.target" ];
-
-    path = [
-      pkgs.git
-      pkgs.nixos-rebuild
-      pkgs.nix
-      pkgs.openssh
-    ];
-
-    serviceConfig.Type = "oneshot";
-
-    script = ''
-      set -euo pipefail
-      repo_url=${lib.escapeShellArg cfg.repoUrl}
-      branch=${lib.escapeShellArg cfg.branch}
-      attr=${lib.escapeShellArg cfg.flakeAttr}
-
-      if [ ! -d ${repoDir}/.git ]; then
-        rm -rf ${repoDir}.tmp
-        git clone --depth 1 --branch "$branch" "$repo_url" ${repoDir}.tmp
-        rm -rf ${repoDir}
-        mv ${repoDir}.tmp ${repoDir}
-      fi
-
-      git -C ${repoDir} fetch --prune origin "$branch"
-      git -C ${repoDir} checkout -B "$branch" "origin/$branch"
-      git -C ${repoDir} submodule update --init --recursive
-
-      nix flake update --flake ${repoDir}
-      nixos-rebuild switch --flake ${repoDir}#"$attr"
-    '';
+    path = with pkgs; [ git nixos-rebuild nix openssh ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${updateScript}";
+    };
   };
 
-  systemd.timers.nix-hil-runner-self-update = {
-    description = "Periodically update nix-hil-runner from upstream";
+  systemd.timers.hil-self-update = {
+    description = "Periodically run hil-self-update";
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnCalendar = cfg.onCalendar;
+      OnCalendar = "hourly";
       Persistent = true;
       RandomizedDelaySec = "15m";
-      Unit = "nix-hil-runner-self-update.service";
+      Unit = "hil-self-update.service";
     };
   };
 }

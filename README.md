@@ -1,37 +1,27 @@
 # nix-hil-runner
 
-Reproducible, updatable NixOS image for ARM SBCs running a GitHub Actions
-self-hosted runner with embedded development tools (probe-rs, espflash, Rust).
+Reproducible NixOS image for ARM SBCs that boots into a generic, unconfigured
+state and is provisioned interactively into a GitHub Actions self-hosted
+runner. All per-device customisation (hostname, SSH keys, runner registration)
+lives on a persistent `/perm` layer, so the same CI-built image goes to every
+device.
 
-The shipped host (`hosts/pi4`) targets a Raspberry Pi 4, but the modules are
-generic — adding another board is one host directory + a few `hil.*` settings.
+## How it works
 
-## Design
-
-- **NixOS unstable** flake-based config.
-- **Generation-based rollback** today; A/B image partitioning is planned in
-  Stage 2 (see `STAGE2.md` once it lands).
-- **Runtime configuration via the firmware partition.** SSH keys and the
-  GitHub runner registration token are read at boot from
-  `/boot/firmware/hil-config/` — no rebuild needed to rotate keys or tokens.
-- **Self-update timer** pulls this flake hourly and runs `nixos-rebuild switch`.
-
-## Repository layout
-
-```
-flake.nix                       # inputs + nixosConfigurations
-hosts/pi4/
-  configuration.nix             # sets `hil.*` for this host
-  hardware.nix                  # board-specific kernel/firmware
-modules/
-  settings.nix                  # `hil.*` option declarations
-  persistent-config.nix         # syncs /boot/firmware/hil-config -> runtime
-  users.nix                     # primary user + sshd
-  github-runner.nix             # runner service, uses hil.runner.*
-  ci-tools.nix                  # probe-rs, espflash, udev rules
-  base-packages.nix             # baseline CLI tools
-  self-update.nix               # hourly nixos-rebuild from upstream
-```
+1. **CI builds one generic image.** No per-host data is baked in.
+2. **First boot — insecure mode.** The device:
+   - accepts SSH password login as `root` / `root`
+   - shows a setup banner with instructions
+3. **`hil-setup`** (run as root) prompts for:
+   - hostname
+   - SSH authorized keys (paste, or `gh:<username>` to fetch from GitHub)
+   - GitHub runner repo URL, name, labels, and registration token
+   All values are written to `/perm/` and the device reboots.
+4. **Subsequent boots — hardened mode.** Because `/perm/configured` exists:
+   - root password is locked, password auth is disabled
+   - SSH keys are synced from `/perm/authorized_keys`
+   - hostname is set from `/perm/hostname`
+   - the runner is registered (using `/perm/runner.{env,token}`) and started
 
 ## Building
 
@@ -43,80 +33,77 @@ nix build .#packages.aarch64-linux.pi4-sd-image
 nix build .#packages.x86_64-linux.pi4-sd-image
 ```
 
-The image lands at `result/sd-image/*.img.zst`.
+CI publishes the same artifact on every push to `master` and on `v*` tags.
 
-## First boot setup
-
-The image ships with no SSH keys and no runner token baked in. Both are read
-from a `hil-config/` directory on the firmware partition (FAT32 — mountable
-from any OS).
-
-### 1. Drop your config onto the SD card
-
-After flashing, mount the FAT32 partition labeled `FIRMWARE` and create:
-
-```
-hil-config/
-  authorized_keys     # one SSH public key per line, for root and the user
-  runner.token        # GitHub runner registration token (no trailing newline)
-```
-
-You can also do this after first boot — the `hil-config-sync.service`
-re-syncs on every boot.
-
-### 2. Boot
+## Flashing & first boot
 
 ```bash
 sudo dd if=result/sd-image/*.img of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-On boot, `hil-config-sync.service` copies:
-- `authorized_keys` → `/etc/ssh/authorized_keys.d/{root,<user>}` (mode 0600)
-- `runner.token`    → `/var/lib/github-runner/.token` (mode 0600)
-
-then sshd and the runner start.
-
-### Getting a runner token
-
-`https://github.com/<owner>/<repo>/settings/actions/runners/new` →
-copy the token (just the token, not the whole `./config.sh` line).
-
-Tokens expire (~1h) — to update, drop a new `runner.token` and
-`systemctl restart hil-config-sync github-runner-<name>`.
-
-## Per-host configuration
-
-Each host sets its identity through `hil.*`:
-
-```nix
-hil = {
-  hostname = "pi4-hil-runner";
-  user = "hil";
-
-  runner = {
-    url = "https://github.com/<owner>/<repo>";
-    name = "pi4-hil-runner";
-    labels = [ "pi4" "aarch64" "nixos" ];
-  };
-
-  selfUpdate = {
-    repoUrl = "https://github.com/<your-fork>/nix-hil-runner.git";
-    flakeAttr = "pi4-aarch64";
-  };
-};
-```
-
-See `modules/settings.nix` for the full option set.
-
-## Remote upgrades
+Boot the device, find its IP, then:
 
 ```bash
-nixos-rebuild switch --flake .#pi4-aarch64 \
-  --target-host hil@<host> --use-remote-sudo
+ssh root@<device-ip>     # password: root
+hil-setup                # follow the prompts
+# device reboots into hardened mode
+```
+
+Re-running `hil-setup` after configuration is supported — it will rewrite
+`/perm/` and reboot. To wipe configuration entirely:
+
+```bash
+sudo rm /perm/configured
+sudo reboot              # device returns to first-boot mode
+```
+
+## /perm layout
+
+| Path                       | Purpose                                       |
+|----------------------------|-----------------------------------------------|
+| `/perm/configured`         | marker file — gates first-boot vs hardened    |
+| `/perm/hostname`           | one line, set via `hostnamectl` at boot       |
+| `/perm/authorized_keys`    | SSH keys, synced to `/etc/ssh/authorized_keys.d/{root,hil}` |
+| `/perm/runner.token`       | GitHub runner registration token              |
+| `/perm/runner.env`         | `URL=`, `NAME=`, `LABELS=` (sourced by runner unit) |
+| `/perm/self-update.env`    | optional `REPO_URL=`, `BRANCH=`, `FLAKE_ATTR=` overrides |
+
+> Stage 1 backs `/perm` with a directory on the rootfs. It survives
+> `nixos-rebuild` but **not** a full SD reflash. Stage 2 (planned) will
+> promote `/perm` to a real partition that survives reflashing the OS.
+
+## Repository layout
+
+```
+flake.nix                       # inputs + nixosConfigurations
+hosts/pi4/
+  configuration.nix             # imports modules + nix/network defaults
+  hardware.nix                  # Pi 4 kernel/firmware
+modules/
+  perm.nix                      # /perm + hil-perm-sync.service
+  firstboot.nix                 # hil-firstboot.service (mode toggle)
+  hil-setup.nix                 # the interactive setup wizard
+  users.nix                     # hil user, sshd defaults
+  runner.nix                    # hil-runner.service (runtime-configured)
+  self-update.nix               # hourly nixos-rebuild from upstream
+  ci-tools.nix                  # probe-rs, espflash, udev rules
+  base-packages.nix             # baseline CLI tools
+```
+
+## Rotating credentials without reboot
+
+```bash
+# Rotate SSH keys
+sudoedit /perm/authorized_keys
+sudo systemctl restart hil-perm-sync.service
+
+# Rotate runner token
+sudoedit /perm/runner.token
+sudo systemctl restart hil-runner.service
 ```
 
 ## Rollback
 
 ```bash
-sudo nixos-rebuild switch --rollback     # on the device
+sudo nixos-rebuild switch --rollback
 ```

@@ -2,30 +2,15 @@
 {
   imports = [
     ./hardware.nix
-    ../../modules/settings.nix
-    ../../modules/persistent-config.nix
+    ../../modules/perm.nix
+    ../../modules/firstboot.nix
+    ../../modules/hil-setup.nix
     ../../modules/users.nix
-    ../../modules/github-runner.nix
+    ../../modules/runner.nix
     ../../modules/ci-tools.nix
     ../../modules/base-packages.nix
     ../../modules/self-update.nix
   ];
-
-  hil = {
-    hostname = "pi4-hil-runner";
-    user = "hil";
-
-    runner = {
-      url = lib.mkDefault "https://github.com/denysvitali/gps-tracker";
-      name = lib.mkDefault "pi4-hil-runner";
-      labels = [ "pi4" "aarch64" "nixos" ];
-    };
-
-    selfUpdate = {
-      repoUrl = lib.mkDefault "https://github.com/denysvitali/nix-hil-runner.git";
-      flakeAttr = "pi4-aarch64";
-    };
-  };
 
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
@@ -33,8 +18,10 @@
     auto-optimise-store = true;
   };
 
+  # Generic identity. The actual hostname is set at runtime by hil-perm-sync
+  # from /perm/hostname once the device has been configured.
   networking = {
-    hostName = config.hil.hostname;
+    hostName = lib.mkDefault "hil-runner";
     networkmanager.enable = true;
     firewall.allowedTCPPorts = [ 22 ];
   };
