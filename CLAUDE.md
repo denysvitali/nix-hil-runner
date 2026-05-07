@@ -34,7 +34,10 @@ nix flake check --no-build
 | `modules/hil-setup.nix` | packages the `hil-setup` wizard |
 | `modules/users.nix` | `hil` user, sshd defaults (key-only by default) |
 | `modules/runner.nix` | `hil-runner.service` — runtime-configured runner unit |
-| `modules/self-update.nix` | hourly `nixos-rebuild` from upstream |
+| `modules/image-ab.nix` | `systemd-repart` partition layout (ESP, store-A/B, perm, root) |
+| `modules/uki-boot.nix` | `systemd-boot` + UKI |
+| `modules/sysupdate.nix` | `systemd-sysupdate` transfers + `sysupdate-package` build target |
+| `modules/pi-uefi.nix` | pftf RPi4 UEFI firmware staged on the ESP |
 | `modules/ci-tools.nix` | probe-rs, espflash, USB udev rules |
 | `modules/base-packages.nix` | baseline CLI tools |
 
@@ -64,9 +67,7 @@ sudoedit /perm/authorized_keys && sudo systemctl restart hil-perm-sync
 sudoedit /perm/runner.token    && sudo systemctl restart hil-runner
 ```
 
-## Stage 2 (not yet implemented)
+## Build outputs
 
-`/perm` is currently a directory on the rootfs (survives rebuilds, not
-reflashes). Stage 2 will promote it to a dedicated partition using
-`systemd-repart`, alongside A/B nix-store partitions and `systemd-sysupdate`
-for OTA partial reflashing.
+- `nix build .#image` — full bootable raw
+- `nix build .#update-package` — `*.store.raw` + UKI + `SHA256SUMS` for OTA

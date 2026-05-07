@@ -1,7 +1,11 @@
 { config, pkgs, lib, ... }:
 {
   imports = [
-    ./hardware.nix
+    ../../modules/image-ab.nix
+    ../../modules/uki-boot.nix
+    ../../modules/sysupdate.nix
+    ../../modules/pi-uefi.nix
+
     ../../modules/perm.nix
     ../../modules/firstboot.nix
     ../../modules/hil-setup.nix
@@ -9,27 +13,28 @@
     ../../modules/runner.nix
     ../../modules/ci-tools.nix
     ../../modules/base-packages.nix
-    ../../modules/self-update.nix
+    # self-update is unnecessary in A/B mode — sysupdate replaces it.
   ];
+
+  nixpkgs.hostPlatform = lib.mkDefault "aarch64-linux";
 
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
     max-jobs = lib.mkDefault 4;
-    auto-optimise-store = true;
   };
 
-  # Generic identity. The actual hostname is set at runtime by hil-perm-sync
-  # from /perm/hostname once the device has been configured.
   networking = {
     hostName = lib.mkDefault "hil-runner";
     networkmanager.enable = true;
     firewall.allowedTCPPorts = [ 22 ];
   };
 
+  # Squashfs nix store is read-only; auto-optimise is incompatible.
+  nix.gc.automatic = false;
+
+  hardware.enableRedistributableFirmware = true;
+
   time.timeZone = "UTC";
   i18n.defaultLocale = "en_US.UTF-8";
-
-  nix.gc.automatic = true;
   system.stateVersion = "24.11";
-  systemd.services.systemd-machine-id-commit.wantedBy = [ "multi-user.target" ];
 }
