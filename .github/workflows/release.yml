@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0   # needed to inspect existing tags for same-day collision
 
-      - uses: DeterminateSystems/nix-installer-action@v21
+      - uses: DeterminateSystems/nix-installer-action@v22
 
       - uses: DeterminateSystems/magic-nix-cache-action@v13
 
