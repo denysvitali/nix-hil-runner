@@ -38,7 +38,7 @@ jobs:
           cp -L result-image/*.raw output/ || true
           cp -L result-update/* output/
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: pi4-${{ github.sha }}
           path: output/*
