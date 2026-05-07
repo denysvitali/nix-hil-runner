@@ -26,12 +26,34 @@ jobs:
           fetch-depth: 0   # needed to inspect existing tags for same-day collision
 
       - uses: DeterminateSystems/nix-installer-action@v22
+        with:
+          # cache-nix-action requires these to keep build deps reachable via
+          # GC roots, otherwise the saved store is missing intermediate paths.
+          extra-conf: |
+            keep-outputs = true
+            keep-env-derivations = true
 
       - name: Configure Nix substituters
         run: |
           mkdir -p ~/.config/nix
           echo "extra-substituters = https://nix-community.cachix.org https://cache.nixos.org" >> ~/.config/nix/nix.conf
           echo "extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" >> ~/.config/nix/nix.conf
+
+      # Cache /nix/store between runs. Primary key tracks flake.lock; on miss
+      # we restore from the most recent prefix-matching cache so changing only
+      # one input still gets most of the closure. After the build, the action
+      # GCs the store down to gc-max-store-size before saving, keeping us
+      # under GitHub's 10 GB per-repo cap.
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'flake.nix', '**/*.nix') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-${{ runner.arch }}-
+          gc-max-store-size-linux: 5G
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-${{ runner.arch }}-
+          purge-created: 0
+          purge-last-accessed: P7D
+          purge-primary-key: never
 
       - name: Compute CalVer version
         id: ver
