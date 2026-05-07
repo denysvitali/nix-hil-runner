@@ -18,7 +18,12 @@
 
   outputs = { self, nixpkgs }:
     let
-      version = nixpkgs.lib.fileContents ./VERSION;
+      # Version is injected at build time by writing ./VERSION (CI does this
+      # from the computed tag). Local builds without a VERSION file get "dev".
+      version =
+        if builtins.pathExists ./VERSION
+        then nixpkgs.lib.fileContents ./VERSION
+        else "dev";
       versionModule = { system.image.version = version; };
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f {
@@ -30,12 +35,13 @@
       nixosConfigurations = {
         pi4 = nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
-          modules = [ ./hosts/pi4/configuration.nix ];
+          modules = [ versionModule ./hosts/pi4/configuration.nix ];
         };
 
         pi4-cross = nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
           modules = [
+            versionModule
             {
               nixpkgs.buildPlatform = "x86_64-linux";
               nixpkgs.hostPlatform = "aarch64-linux";

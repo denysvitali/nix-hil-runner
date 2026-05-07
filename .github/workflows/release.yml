@@ -33,6 +33,8 @@ jobs:
 
       - name: Compute CalVer version
         id: ver
+        env:
+          RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
           today=$(date -u +%Y.%-m.%-d)
@@ -40,8 +42,9 @@ jobs:
 
           # First release of the day: bare CalVer (e.g. v2026.5.7).
           # Subsequent same-day releases append the UTC build time as HHMM
-          # (e.g. v2026.5.7.1430). Always sortable, always points at when it
-          # was built. If even HHMM collides, fall back to the short SHA.
+          # (e.g. v2026.5.7.1430) — sortable and points at when the build ran.
+          # If even HHMM collides (manual reruns within the same minute),
+          # append the GitHub Actions run id, which is globally unique.
           git fetch --tags --quiet
           if ! git rev-parse "$base" >/dev/null 2>&1; then
             tag="$base"
@@ -51,8 +54,7 @@ jobs:
             if ! git rev-parse "$candidate" >/dev/null 2>&1; then
               tag="$candidate"
             else
-              short=$(git rev-parse --short=7 HEAD)
-              tag="${base}.${hhmm}-${short}"
+              tag="${base}.${hhmm}.r${RUN_ID}"
             fi
           fi
 
@@ -61,8 +63,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Computed tag=$tag version=$version"
 
-      - name: Stamp VERSION (only on master push)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      - name: Stamp VERSION (untracked, baked into the image build)
         run: printf '%s' '${{ steps.ver.outputs.version }}' > VERSION
 
       - name: Build image
