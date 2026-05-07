@@ -9,7 +9,8 @@ in
 
   system.image = {
     id = lib.mkDefault "hil-runner";
-    version = lib.mkDefault "1";
+    # Set by the flake from ./VERSION (CI overwrites that file before build).
+    version = lib.mkDefault "dev";
   };
 
   image.repart = {

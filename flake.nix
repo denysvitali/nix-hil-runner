@@ -18,6 +18,8 @@
 
   outputs = { self, nixpkgs }:
     let
+      version = nixpkgs.lib.fileContents ./VERSION;
+      versionModule = { system.image.version = version; };
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f {
         inherit system;
