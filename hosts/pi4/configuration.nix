@@ -6,12 +6,14 @@
     ../../modules/ci-tools.nix
     ../../modules/base-packages.nix
     ../../modules/ssh-keys.nix
+    ../../modules/self-update.nix
   ];
 
   # GitHub Actions runner is configured in modules/github-runner.nix
 
   # ============== Nix Daemon Configuration ==============
   nix.settings = {
+    experimental-features = [ "nix-command" "flakes" ];
     max-jobs = lib.mkDefault 4;
     auto-optimise-store = true;
   };

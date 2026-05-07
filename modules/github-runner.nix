@@ -29,20 +29,11 @@
     PrivateDevices = false;
   };
 
-  # Create a skeleton token file if it doesn't exist (with instructions)
+  # The runner should wait until networking is really online at boot.
+  # If the runner is already registered, the persisted runner state under
+  # /var/lib/github-runner is enough for normal restarts.
   config.systemd.services.github-runner-pi4 = {
-    preStart = lib.mkAfter ''
-      if [ ! -f /var/lib/github-runner/.token ]; then
-        echo "# GitHub Actions Runner Token File" > /var/lib/github-runner/.token
-        echo "# Place your runner token in this file, then restart the service:" >> /var/lib/github-runner/.token
-        echo "# sudo systemctl restart github-runner-pi4.service" >> /var/lib/github-runner/.token
-        echo "#" >> /var/lib/github-runner/.token
-        echo "# Get your token from: https://github.com/denysvitali/gps-tracker-tr003-v2/settings/actions/runners/new" >> /var/lib/github-runner/.token
-        echo "#" >> /var/lib/github-runner/.token
-        echo "# Example (replace with your actual token):" >> /var/lib/github-runner/.token
-        echo "# YOUR_RUNNER_TOKEN_HERE" >> /var/lib/github-runner/.token
-        chmod 0600 /var/lib/github-runner/.token
-      fi
-    '';
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
   };
 }
