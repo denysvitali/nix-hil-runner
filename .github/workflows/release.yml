@@ -33,6 +33,15 @@ jobs:
           echo "extra-substituters = https://nix-community.cachix.org https://cache.nixos.org" >> ~/.config/nix/nix.conf
           echo "extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" >> ~/.config/nix/nix.conf
 
+      # Cachix configures the substituter+public key automatically. Pushes are
+      # skipped for PR/fork builds (no token); master pushes upload everything
+      # built during this run.
+      - uses: cachix/cachix-action@v17
+        with:
+          name: nix-hil-runner
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: ${{ github.event_name != 'push' || github.ref != 'refs/heads/master' }}
+
       - name: Compute CalVer version
         id: ver
         env:
