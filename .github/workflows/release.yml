@@ -77,7 +77,7 @@ jobs:
           cp -L result-image/*.raw output/ || true
           cp -L result-update/* output/
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: image-${{ steps.ver.outputs.tag }}
           path: output/*
@@ -91,7 +91,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: image-${{ needs.build.outputs.tag }}
           path: output
