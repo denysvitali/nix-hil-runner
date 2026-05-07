@@ -5,7 +5,7 @@ let
   # systemd-boot in /EFI/BOOT/BOOTAA64.EFI on the ESP.
   pftfRPi4 = pkgs.fetchzip {
     url = "https://github.com/pftf/RPi4/releases/download/v1.41/RPi4_UEFI_Firmware_v1.41.zip";
-    hash = "sha256-+L+fIVvPv7yeyCikoDC85jFhtEKjvCLU7nsq/zXf0R0=";
+    hash = "sha256-MVvoIO26JNEi1maOYcgk0h/Heb9W+Y8mgh7l8GFC4/k=";
     stripRoot = false;
   };
 in
