@@ -68,9 +68,49 @@ sudo reboot              # device returns to first-boot mode
 | `/perm/runner.env`         | `URL=`, `NAME=`, `LABELS=` (sourced by runner unit) |
 | `/perm/self-update.env`    | optional `REPO_URL=`, `BRANCH=`, `FLAKE_ATTR=` overrides |
 
-> Stage 1 backs `/perm` with a directory on the rootfs. It survives
-> `nixos-rebuild` but **not** a full SD reflash. Stage 2 (planned) will
-> promote `/perm` to a real partition that survives reflashing the OS.
+> The legacy SD image (`pi4-sd-image`) backs `/perm` with a directory on the
+> rootfs — survives `nixos-rebuild`, not a full reflash. The A/B image
+> (`pi4-ab-image`, see below) backs it with a real partition that survives
+> OTA updates.
+
+## A/B image with OTA updates (experimental)
+
+`nix build .#pi4-ab-image` produces a `systemd-repart`-built raw image with:
+
+| Partition | Purpose                                        |
+|-----------|-----------------------------------------------|
+| `ESP`     | pftf RPi4 UEFI firmware + systemd-boot + UKI  |
+| `store_1` | nix-store slot A (squashfs, read-only)        |
+| `_empty`  | nix-store slot B (filled by first OTA update) |
+| `perm`    | persistent `/perm` (survives OTA)             |
+| `root`    | mutable root filesystem                       |
+
+Boot path: Pi GPU → pftf `RPI_EFI.fd` → systemd-boot → UKI from `/EFI/Linux`.
+
+OTA updates are driven by `systemd-sysupdate`:
+
+```bash
+updatectl check
+updatectl update
+```
+
+Updates fetch a versioned `*.store.raw` (new nix store slot) and a versioned
+`*.efi` (new UKI), written into the inactive partition / ESP folder. Reboot
+selects the new version; rolling back is a `systemd-boot` menu choice.
+
+CI publishes per-tag releases (`v*`):
+- `pi4-ab-image` — full bootable raw
+- `pi4-ab-update-package` — `*.store.raw` + `*.efi` + `SHA256SUMS` for OTA
+
+> ⚠️ **Untested on hardware.** This drop ships the design end-to-end and
+> evaluates cleanly, but it has not been booted on a real Pi 4. Expect to
+> iterate on:
+> - exact pftf payload layout (the whole tree is staged at the ESP root)
+> - sysupdate `Path` URL — currently points at the GitHub Releases
+>   `latest` tag; adjust to your release strategy
+> - UKI/kernel size vs ESP size (256MB) and store partition size (2GB)
+>
+> The legacy `pi4-sd-image` build remains the default and is unchanged.
 
 ## Repository layout
 

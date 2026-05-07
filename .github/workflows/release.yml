@@ -1,0 +1,63 @@
+name: Release A/B image and update package
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: DeterminateSystems/nix-installer-action@v21
+
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+
+      - name: Configure Nix substituters
+        run: |
+          mkdir -p ~/.config/nix
+          echo "extra-substituters = https://nix-community.cachix.org https://cache.nixos.org" >> ~/.config/nix/nix.conf
+          echo "extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" >> ~/.config/nix/nix.conf
+
+      - name: Compute version
+        id: ver
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          [ -z "$v" ] && v="$(date -u +%Y%m%d%H%M%S)"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Build full A/B image
+        run: |
+          nix build -L \
+            --override-input nixpkgs github:NixOS/nixpkgs/nixos-unstable \
+            --argstr version "${{ steps.ver.outputs.version }}" \
+            .#packages.aarch64-linux.pi4-ab-image \
+            -o result-image || \
+          nix build -L .#packages.aarch64-linux.pi4-ab-image -o result-image
+
+      - name: Build sysupdate package
+        run: nix build -L .#packages.aarch64-linux.pi4-ab-update-package -o result-update
+
+      - name: Stage release artifacts
+        run: |
+          mkdir -p output
+          cp -L result-image/*.raw output/ || true
+          cp -L result-update/* output/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: pi4-ab-${{ steps.ver.outputs.version }}
+          path: output/*
+
+      - name: Create / update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: output/*
+          generate_release_notes: true
