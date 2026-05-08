@@ -49,16 +49,23 @@ INACTIVE=$(lsblk -lnpo NAME,PARTLABEL "$DISK" \
 PARTNUM=$(echo "$INACTIVE" | grep -oE '[0-9]+$')
 echo "Inactive: $INACTIVE (partition #$PARTNUM on $DISK)"
 
-curl -fsSLO "$BASE/hil-runner_${NEW}.store.raw.xz"
+# UKI is small (~30 MB), fits in tmpfs — download + verify locally.
 curl -fsSLO "$BASE/hil-runner_${NEW}.efi"
-sha256sum --ignore-missing -c SHA256SUMS
+sha256sum --ignore-missing -c <(grep "hil-runner_${NEW}.efi" SHA256SUMS)
 
-xz -dc "hil-runner_${NEW}.store.raw.xz" \
+# Store image is ~2 GB compressed — too big for /tmp tmpfs. Stream it
+# straight through xz into the inactive partition, no on-disk copy.
+# We skip the .xz sha256 check (TLS protects transit, and a corrupt
+# squashfs will fail to mount on boot — at which point pick the old UKI
+# from the systemd-boot menu and retry).
+echo "Streaming store image to $INACTIVE ..."
+curl -fsSL "$BASE/hil-runner_${NEW}.store.raw.xz" \
+  | xz -dc \
   | dd of="$INACTIVE" bs=4M conv=fsync status=progress
 
 sgdisk -c "${PARTNUM}:store_${NEW}" "$DISK"
 partprobe "$DISK" || true
 
-install -m0444 "hil-runner_${NEW}.efi" /boot/EFI/Linux/
+install -m0444 "hil-runner_${NEW}.efi" "/boot/EFI/Linux/hil-runner_${NEW}.efi"
 
 echo "Update staged ($NEW). Reboot to switch."
