@@ -25,6 +25,12 @@ jobs:
         with:
           fetch-depth: 0   # needed to inspect existing tags for same-day collision
 
+      # Ubuntu 24.04 ships AppArmor's unprivileged userns restriction enabled,
+      # which breaks `image.repart`'s nested `unshare --user --map-root-user`
+      # inside the Nix build sandbox (uid_map write -> EPERM).
+      - name: Allow unprivileged user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - uses: DeterminateSystems/nix-installer-action@v22
         with:
           # cache-nix-action requires these to keep build deps reachable via
