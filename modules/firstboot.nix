@@ -3,10 +3,33 @@ let
   sshdDropinDir = "/etc/systemd/system/sshd.service.d";
   sshdDropin = "${sshdDropinDir}/firstboot.conf";
 
+  # Self-contained sshd config used only while the device is unconfigured.
+  # We don't override the hardened /etc/ssh/sshd_config with -o flags because
+  # that's fragile (depends on flag precedence + daemon-reload timing). Point
+  # sshd at a fresh config instead. NixOS's sshd ExecStartPre still generates
+  # host keys at /etc/ssh/ssh_host_*_key, so we just reference them here.
+  firstbootSshdConfig = pkgs.writeText "sshd_config-firstboot" ''
+    Port 22
+    AddressFamily any
+
+    HostKey /etc/ssh/ssh_host_ed25519_key
+    HostKey /etc/ssh/ssh_host_rsa_key
+
+    PermitRootLogin yes
+    PasswordAuthentication yes
+    KbdInteractiveAuthentication yes
+    UsePAM yes
+    PrintMotd yes
+
+    AuthorizedKeysFile /etc/ssh/authorized_keys.d/%u
+
+    Subsystem sftp ${pkgs.openssh}/libexec/sftp-server
+  '';
+
   sshdDropinContent = ''
     [Service]
     ExecStart=
-    ExecStart=${pkgs.openssh}/bin/sshd -D -f /etc/ssh/sshd_config -o PermitRootLogin=yes -o PasswordAuthentication=yes
+    ExecStart=${pkgs.openssh}/bin/sshd -D -f ${firstbootSshdConfig}
   '';
 
   motdFirstBoot = ''
