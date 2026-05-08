@@ -1,6 +1,6 @@
 { config, lib, pkgs, modulesPath, ... }:
 let
-  storeSize = "2G";
+  storeSize = "3G";
 in
 {
   imports = [

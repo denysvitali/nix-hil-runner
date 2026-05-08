@@ -129,5 +129,5 @@ This image has not been booted on real hardware yet. Likely iteration points:
 - exact pftf payload layout staged on the ESP
 - `sysupdate.nix` `Path` URL — currently a GitHub Releases pattern; adjust
   to your release strategy (e.g. GitHub Pages, signed releases)
-- size budgets (256M ESP, 2G store) — bump if the closure outgrows them
+- size budgets (256M ESP, 3G store) — bump if the closure outgrows them
 - UKI generation under cross-compile
