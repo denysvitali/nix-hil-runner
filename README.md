@@ -47,14 +47,13 @@ nix build .#packages.aarch64-linux.image
 nix build .#packages.x86_64-linux.image
 ```
 
-CI (`release.yml`) builds the same image on every push to `master`, uploads
-the raw image as a workflow artifact, and creates a release tag on pushes to
-`master`.
+CI (`release.yml`) builds the same image on every push to `master` and
+publishes a gzip-compressed raw image on release tags.
 
 ## Flashing & first boot
 
 ```bash
-sudo dd if=result/*.raw of=/dev/sdX bs=4M status=progress conv=fsync
+gzip -dc result/*.raw.gz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
 Boot the device, find its IP, then:
