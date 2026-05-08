@@ -93,8 +93,14 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Computed tag=$tag version=$version"
 
-      - name: Stamp VERSION (untracked, baked into the image build)
-        run: printf '%s' '${{ steps.ver.outputs.version }}' > VERSION
+      - name: Stamp VERSION (baked into the image build)
+        # Flakes evaluate against the git-tracked source tree only, so an
+        # untracked VERSION is invisible to `builtins.pathExists ./VERSION`
+        # in flake.nix and the build falls back to "dev". Force-add it
+        # (no commit needed) so the flake source enumeration picks it up.
+        run: |
+          printf '%s' '${{ steps.ver.outputs.version }}' > VERSION
+          git -c user.name=ci -c user.email=ci@local add -f VERSION
 
       - name: Build image
         run: nix build -L .#packages.aarch64-linux.image -o result-image
