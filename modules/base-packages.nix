@@ -8,5 +8,6 @@
     curl
     wget
     vim
+    unzip
   ];
 }
