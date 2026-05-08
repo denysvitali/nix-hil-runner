@@ -105,7 +105,12 @@ jobs:
       - name: Stage release artifacts
         run: |
           mkdir -p output
-          cp -L result-image/*.raw output/ || true
+          for artifact in result-image/*.raw; do
+            case "$artifact" in
+              *.store.raw) continue ;;
+            esac
+            cp -L "$artifact" output/
+          done
           cp -L result-update/* output/
 
       - uses: actions/upload-artifact@v7
