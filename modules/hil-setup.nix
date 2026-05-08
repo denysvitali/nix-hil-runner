@@ -86,7 +86,11 @@ let
       NAME=$runner_name
       LABELS=$runner_labels
       EOF
-      chmod 0600 "$PERM/authorized_keys" "$PERM/runner.token" "$PERM/runner.env"
+      chmod 0600 "$PERM/authorized_keys" "$PERM/runner.env"
+      # The runner unit runs as `github-runner` and cats this file directly,
+      # so the file must be group-readable by that group.
+      chown root:github-runner "$PERM/runner.token"
+      chmod 0640 "$PERM/runner.token"
       chmod 0644 "$PERM/hostname"
       touch "$PERM/configured"
 

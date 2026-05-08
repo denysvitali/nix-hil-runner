@@ -1,6 +1,11 @@
 { config, lib, pkgs, ... }:
 let
-  sshdDropinDir = "/etc/systemd/system/sshd.service.d";
+  # NixOS makes /etc/systemd/system a read-only symlink into the Nix store, so
+  # runtime drop-ins have to live under /run/systemd/system. systemd reads
+  # drop-ins from /run with higher precedence than /etc, and the path is on
+  # tmpfs so it's always writable and disappears on reboot (which is exactly
+  # what we want for a first-boot toggle).
+  sshdDropinDir = "/run/systemd/system/sshd.service.d";
   sshdDropin = "${sshdDropinDir}/firstboot.conf";
 
   # Self-contained sshd config used only while the device is unconfigured.

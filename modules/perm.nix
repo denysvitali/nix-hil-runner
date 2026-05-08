@@ -4,6 +4,7 @@
   # (Stage 2 will promote it to a dedicated partition that survives reflash).
   systemd.tmpfiles.rules = [
     "d /perm 0755 root root - -"
+    "d /etc/ssh/authorized_keys.d 0755 root root - -"
   ];
 
   systemd.services.hil-perm-sync = {
@@ -22,7 +23,6 @@
         exit 0
       fi
 
-      install -d -m 0755 /etc/ssh/authorized_keys.d
       if [ -f /perm/authorized_keys ]; then
         for u in root hil; do
           install -m 0600 -o root -g root \
@@ -31,7 +31,11 @@
       fi
 
       if [ -s /perm/hostname ]; then
-        ${pkgs.systemd}/bin/hostnamectl set-hostname "$(cat /perm/hostname)"
+        # NixOS forbids writing the static /etc/hostname (it's a symlink into
+        # the Nix store), so plain `hostnamectl set-hostname` errors out. The
+        # transient hostname is the one the kernel actually uses, and that's
+        # the one we want to drive from /perm anyway.
+        ${pkgs.systemd}/bin/hostnamectl --transient set-hostname "$(cat /perm/hostname)"
       fi
     '';
   };
