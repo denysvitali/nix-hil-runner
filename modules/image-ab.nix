@@ -46,6 +46,7 @@ in
           Type = "linux-generic";
           Label = "store_${config.system.image.version}";
           Format = "squashfs";
+          Compression = "xz";
           ReadOnly = "yes";
           Minimize = "off";
           SizeMinBytes = storeSize;
