@@ -1,11 +1,11 @@
 { config, lib, pkgs, ... }:
 let
-  # Override at deploy time by writing /perm/sysupdate-source with a URL,
-  # or change the default here when forking. Use a path your CI publishes
-  # the *.store.raw and *.efi files (with SHA256SUMS) under.
+  # Rolling 'updates' release maintained by .github/workflows/release.yml:
+  # each successful master build replaces the assets there, so this URL
+  # always serves the current SHA256SUMS plus the matching *.store.raw / *.efi.
   defaultSource = {
     Type = "url-file";
-    Path = "https://example.invalid/nix-hil-runner/updates/";
+    Path = "https://github.com/denysvitali/nix-hil-runner/releases/download/updates/";
   };
 in
 {

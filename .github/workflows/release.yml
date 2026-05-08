@@ -99,6 +99,9 @@ jobs:
       - name: Build image
         run: nix build -L .#packages.aarch64-linux.image -o result-image
 
+      - name: Build update package
+        run: nix build -L .#packages.aarch64-linux.update-package -o result-update
+
       - name: Stage release artifacts
         run: |
           mkdir -p output
@@ -110,11 +113,16 @@ jobs:
           done
           gzip -9 output/*.raw
 
+          mkdir -p output-update
+          cp -L result-update/* output-update/
+
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'push' || github.ref != 'refs/heads/master'
         with:
           name: image-${{ steps.ver.outputs.tag }}
-          path: output/*
+          path: |
+            output/*
+            output-update/*
 
       - name: Create tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -132,5 +140,34 @@ jobs:
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ steps.ver.outputs.tag }}
-          files: output/*
+          files: |
+            output/*
+            output-update/*
           generate_release_notes: true
+
+      # Rolling 'updates' release: assets get replaced on every master build so
+      # systemd-sysupdate clients fetching <release>/SHA256SUMS always see the
+      # current version. Versioned releases above remain the audit trail.
+      - name: Publish to rolling 'updates' release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if ! gh release view updates >/dev/null 2>&1; then
+            gh release create updates \
+              --target master \
+              --title "Rolling update channel" \
+              --notes "Auto-updated by CI on every master build. Used by systemd-sysupdate; see modules/sysupdate.nix." \
+              --prerelease
+          fi
+
+          # Asset filenames are version-stamped, so old ones won't be overwritten by --clobber.
+          # Wipe everything on the release before uploading the current build's artifacts.
+          existing=$(gh release view updates --json assets --jq '.assets[].name')
+          for name in $existing; do
+            gh release delete-asset updates "$name" --yes
+          done
+
+          gh release upload updates output-update/*

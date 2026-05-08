@@ -58,7 +58,6 @@ at runtime works without conflicts.
 - `authorized_keys`   — synced to `/etc/ssh/authorized_keys.d/{root,hil}`
 - `runner.token`      — registration token (read by runner unit at start)
 - `runner.env`        — `URL=`, `NAME=`, `LABELS=`
-- `self-update.env`   — optional overrides for self-update
 
 ## Rotating credentials
 
