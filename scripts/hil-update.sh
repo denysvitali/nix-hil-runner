@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# In-place A/B update for hil-runner devices that don't have systemd-sysupdate
+# wired up yet. Pulls the latest store image + UKI from the rolling 'updates'
+# release, writes the store into the inactive slot, relabels its GPT partition,
+# drops the new UKI next to the existing one, and leaves the boot decision to
+# systemd-boot's newest-UKI default. Old slot stays intact for rollback.
+set -euo pipefail
+
+BASE=${BASE:-https://github.com/denysvitali/nix-hil-runner/releases/download/updates}
+TMP=$(mktemp -d) && cd "$TMP"
+trap 'rm -rf "$TMP"' EXIT
+
+curl -fsSLO "$BASE/SHA256SUMS"
+NEW=$(awk '{print $2}' SHA256SUMS \
+       | grep -oE 'hil-runner_[^ ]+\.store\.raw\.xz' \
+       | head -1 | sed 's/hil-runner_//;s/\.store\.raw\.xz//')
+[[ -n "$NEW" ]] || { echo "no store asset in SHA256SUMS"; exit 1; }
+
+# /nix/store is mounted twice on NixOS (initrd + systemd remount); awk+exit
+# returns the first match only, avoiding multi-line `findmnt -no SOURCE`.
+ACTIVE=$(awk '$2=="/nix/store"{print $1; exit}' /proc/mounts)
+[[ -L "$ACTIVE" ]] && ACTIVE=$(readlink -f "$ACTIVE")
+[[ -b "$ACTIVE" ]] || { echo "active device not a block device: $ACTIVE"; exit 1; }
+
+DISK=$(lsblk -no PKNAME "$ACTIVE" 2>/dev/null || true)
+if [[ -z "$DISK" ]]; then
+  case "$ACTIVE" in
+    *mmcblk*p[0-9]*|*nvme*p[0-9]*) DISK=${ACTIVE%p*} ;;
+    *)                              DISK=$(echo "$ACTIVE" | sed -E 's/[0-9]+$//') ;;
+  esac
+  DISK=${DISK#/dev/}
+fi
+DISK=/dev/${DISK#/dev/}
+[[ -b "$DISK" ]] || { echo "ERROR: $DISK not a block device"; exit 1; }
+
+ACTIVE_LABEL=$(lsblk -no PARTLABEL "$ACTIVE" 2>/dev/null || true)
+ACTIVE_VER=${ACTIVE_LABEL#store_}
+echo "Active: $ACTIVE  (label=$ACTIVE_LABEL, version=$ACTIVE_VER)"
+echo "New:    $NEW"
+
+if [[ "$NEW" == "$ACTIVE_VER" ]]; then
+  echo "Refusing to update: new version equals running version."
+  exit 1
+fi
+
+INACTIVE=$(lsblk -lnpo NAME,PARTLABEL "$DISK" \
+  | awk -v a="$ACTIVE" '$1!=a && ($2=="_empty" || $2 ~ /^store_/) {print $1; exit}')
+[[ -n "$INACTIVE" ]] || { echo "no inactive store slot found"; exit 1; }
+PARTNUM=$(echo "$INACTIVE" | grep -oE '[0-9]+$')
+echo "Inactive: $INACTIVE (partition #$PARTNUM on $DISK)"
+
+curl -fsSLO "$BASE/hil-runner_${NEW}.store.raw.xz"
+curl -fsSLO "$BASE/hil-runner_${NEW}.efi"
+sha256sum --ignore-missing -c SHA256SUMS
+
+xz -dc "hil-runner_${NEW}.store.raw.xz" \
+  | dd of="$INACTIVE" bs=4M conv=fsync status=progress
+
+sgdisk -c "${PARTNUM}:store_${NEW}" "$DISK"
+partprobe "$DISK" || true
+
+install -m0444 "hil-runner_${NEW}.efi" /boot/EFI/Linux/
+
+echo "Update staged ($NEW). Reboot to switch."
