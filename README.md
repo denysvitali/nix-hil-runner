@@ -71,6 +71,14 @@ To return to first-boot mode: `sudo rm /perm/configured && sudo reboot`.
 `systemd-sysupdate` swaps the inactive nix-store partition and the UKI
 on update; `/perm` is untouched.
 
+GitHub release assets larger than 2 GiB are published as numbered
+`.part-000`, `.part-001`, ... chunks. Reassemble them before flashing or
+before mirroring an OTA payload for `systemd-sysupdate`:
+
+```bash
+cat hil-runner_2026.5.8.store.raw.part-* > hil-runner_2026.5.8.store.raw
+```
+
 ```bash
 updatectl check
 updatectl update
