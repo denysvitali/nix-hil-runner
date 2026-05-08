@@ -14,8 +14,12 @@ in
 
     transfers = {
       "10-nix-store" = {
+        # GitHub release assets are capped at 2 GB; the raw store image is
+        # larger than that, so we publish it xz-compressed. systemd-sysupdate
+        # transparently decompresses sources whose MatchPattern ends in
+        # .gz/.bz2/.xz/.zst.
         Source = defaultSource // {
-          MatchPattern = [ "${config.system.image.id}_@v.store.raw" ];
+          MatchPattern = [ "${config.system.image.id}_@v.store.raw.xz" ];
         };
         Target = {
           InstancesMax = 2;
@@ -45,15 +49,17 @@ in
   };
 
   # Build target: the parts of the image needed for an OTA update.
+  # The store image is xz-compressed to stay under GitHub's 2 GB release-asset
+  # limit; sysupdate transparently decompresses on apply.
   system.build.sysupdate-package =
-    pkgs.runCommand "sysupdate-package-${config.system.image.version}" { }
-      ''
-        mkdir $out
-        cp ${config.system.build.uki}/${config.system.boot.loader.ukiFile} \
-           $out/${config.boot.uki.name}_${config.system.image.version}.efi
-        cp ${config.system.build.image}/${config.system.image.id}_${config.system.image.version}.store.raw \
-           $out/
-        cd $out
-        ${pkgs.coreutils}/bin/sha256sum * > SHA256SUMS
-      '';
+    pkgs.runCommand "sysupdate-package-${config.system.image.version}" { } ''
+      mkdir $out
+      cp ${config.system.build.uki}/${config.system.boot.loader.ukiFile} \
+         $out/${config.boot.uki.name}_${config.system.image.version}.efi
+      ${pkgs.xz}/bin/xz -T0 -9e -c \
+         ${config.system.build.image}/${config.system.image.id}_${config.system.image.version}.store.raw \
+         > $out/${config.system.image.id}_${config.system.image.version}.store.raw.xz
+      cd $out
+      ${pkgs.coreutils}/bin/sha256sum * > SHA256SUMS
+    '';
 }
