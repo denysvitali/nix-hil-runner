@@ -11,6 +11,8 @@
 
   users.mutableUsers = true;
 
+  users.users.root.initialPassword = lib.mkDefault "root";
+
   users.users.hil = {
     isNormalUser = true;
     description = "HIL runner user";
