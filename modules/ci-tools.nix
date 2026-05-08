@@ -5,6 +5,12 @@
     # Embedded development tools
     probe-rs-tools
     espflash
+
+    # Rust toolchain
+    cargo
+    rustc
+    rustfmt
+    clippy
   ];
 
   # ============== USB/Probe Device Permissions ==============

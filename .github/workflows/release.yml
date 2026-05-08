@@ -99,9 +99,6 @@ jobs:
       - name: Build image
         run: nix build -L .#packages.aarch64-linux.image -o result-image
 
-      - name: Build sysupdate package
-        run: nix build -L .#packages.aarch64-linux.update-package -o result-update
-
       - name: Stage release artifacts
         run: |
           mkdir -p output
@@ -111,15 +108,6 @@ jobs:
             esac
             cp -L "$artifact" output/
           done
-          cp -L result-update/* output/
-          find output -maxdepth 1 -type f -name '*.raw' -print0 |
-            while IFS= read -r -d '' artifact; do
-              tar --sparse -I 'gzip -9' -cf "$artifact.tar.gz" \
-                -C "$(dirname "$artifact")" "$(basename "$artifact")"
-              rm "$artifact"
-            done
-          rm -f output/SHA256SUMS
-          (cd output && sha256sum * > SHA256SUMS)
 
       - uses: actions/upload-artifact@v7
         with:
@@ -135,11 +123,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v8
-        with:
-          name: image-${{ needs.build.outputs.tag }}
-          path: output
-
       - name: Create tag
         run: |
           set -euo pipefail
@@ -154,5 +137,4 @@ jobs:
         with:
           tag_name: ${{ needs.build.outputs.tag }}
           name: ${{ needs.build.outputs.tag }}
-          files: output/*
           generate_release_notes: true

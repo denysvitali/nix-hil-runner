@@ -2,8 +2,8 @@
 
 Reproducible NixOS A/B image for ARM SBCs (Raspberry Pi 4) that boots into
 a generic, unconfigured state and is provisioned interactively into a
-GitHub Actions self-hosted runner. CI publishes a single generic image
-plus an OTA update package for every device.
+GitHub Actions self-hosted runner. CI publishes a single generic raw image
+artifact for every device.
 
 ## How it works
 
@@ -47,8 +47,9 @@ nix build .#packages.aarch64-linux.image
 nix build .#packages.x86_64-linux.image
 ```
 
-CI (`release.yml`) builds the same outputs on every push to `master` and
-publishes `image` + `update-package` on `v*` tags.
+CI (`release.yml`) builds the same image on every push to `master`, uploads
+the raw image as a workflow artifact, and creates a release tag on pushes to
+`master`.
 
 ## Flashing & first boot
 
@@ -70,14 +71,6 @@ To return to first-boot mode: `sudo rm /perm/configured && sudo reboot`.
 
 `systemd-sysupdate` swaps the inactive nix-store partition and the UKI
 on update; `/perm` is untouched.
-
-Raw image artifacts are published as sparse gzip-compressed tar archives.
-Extract them before flashing or before mirroring an OTA payload for
-`systemd-sysupdate`:
-
-```bash
-tar -xzf hil-runner_2026.5.8.store.raw.tar.gz
-```
 
 ```bash
 updatectl check
