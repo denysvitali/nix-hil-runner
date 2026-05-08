@@ -63,8 +63,11 @@ curl -fsSL "$BASE/hil-runner_${NEW}.store.raw.xz" \
   | xz -dc \
   | dd of="$INACTIVE" bs=4M conv=fsync status=progress
 
-sgdisk -c "${PARTNUM}:store_${NEW}" "$DISK"
-partprobe "$DISK" || true
+# Rename the GPT partition label so the new UKI's fileSystems entry
+# (mounted by /dev/disk/by-partlabel/store_<version>) resolves on boot.
+# Use sfdisk from util-linux — always present, unlike sgdisk.
+sfdisk --part-label "$DISK" "$PARTNUM" "store_${NEW}"
+udevadm settle
 
 install -m0444 "hil-runner_${NEW}.efi" "/boot/EFI/Linux/hil-runner_${NEW}.efi"
 
