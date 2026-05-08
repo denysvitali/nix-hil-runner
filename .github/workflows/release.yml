@@ -112,9 +112,10 @@ jobs:
             cp -L "$artifact" output/
           done
           cp -L result-update/* output/
-          find output -maxdepth 1 -type f -size +1900M -print0 |
+          find output -maxdepth 1 -type f -name '*.raw' -print0 |
             while IFS= read -r -d '' artifact; do
-              split -b 1900M -d -a 3 "$artifact" "$artifact.part-"
+              tar --sparse -I 'gzip -9' -cf "$artifact.tar.gz" \
+                -C "$(dirname "$artifact")" "$(basename "$artifact")"
               rm "$artifact"
             done
           rm -f output/SHA256SUMS
