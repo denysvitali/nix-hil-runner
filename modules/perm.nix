@@ -18,25 +18,42 @@
     };
     script = ''
       set -eu
+      users="root hil"
+
       if [ ! -f /perm/configured ]; then
         echo "device not yet configured; skipping perm sync"
         exit 0
       fi
 
+      key_count=0
       if [ -f /perm/authorized_keys ]; then
-        for u in root hil; do
+        key_count=$(grep -cvE '^[[:space:]]*(#|$)' /perm/authorized_keys || true)
+        for u in $users; do
           install -m 0600 -o root -g root \
             /perm/authorized_keys "/etc/ssh/authorized_keys.d/$u"
         done
       fi
 
+      hostname=""
       if [ -s /perm/hostname ]; then
+        hostname=$(cat /perm/hostname)
         # NixOS forbids writing the static /etc/hostname (it's a symlink into
         # the Nix store), so plain `hostnamectl set-hostname` errors out. The
         # transient hostname is the one the kernel actually uses, and that's
         # the one we want to drive from /perm anyway.
-        ${pkgs.systemd}/bin/hostnamectl --transient set-hostname "$(cat /perm/hostname)"
+        ${pkgs.systemd}/bin/hostnamectl --transient set-hostname "$hostname"
       fi
+
+      echo "synced $key_count keys for users $(echo $users | tr ' ' ','); hostname=''${hostname:-<unset>}"
     '';
+  };
+
+  systemd.paths.hil-perm-watch = {
+    description = "Watch /perm/{authorized_keys,hostname} and re-trigger hil-perm-sync";
+    wantedBy = [ "multi-user.target" ];
+    pathConfig = {
+      PathChanged = [ "/perm/authorized_keys" "/perm/hostname" ];
+      Unit = "hil-perm-sync.service";
+    };
   };
 }
