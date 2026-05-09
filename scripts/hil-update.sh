@@ -6,7 +6,38 @@
 # systemd-boot's newest-UKI default. Old slot stays intact for rollback.
 set -euo pipefail
 
+usage() {
+  cat <<EOF
+Usage: hil-update [OPTIONS]
+
+In-place A/B update for hil-runner. Streams the latest store image + UKI
+from the 'updates' release into the inactive slot, relabels its GPT
+partlabel, and installs the new UKI. Reboot to switch.
+
+Options:
+  -h, --help        Show this help and exit.
+      --dry-run     Plan only — no dd, no sfdisk, no UKI install.
+      --force       Skip the "new == running" guard (re-flash same version).
+      --base URL    Release base URL (default: \$BASE or the upstream rolling
+                    'updates' release). Env var BASE= still works as fallback.
+EOF
+}
+
+DRY=0
+FORCE=0
 BASE=${BASE:-https://github.com/denysvitali/nix-hil-runner/releases/download/updates}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)    usage; exit 0 ;;
+    --dry-run)    DRY=1; shift ;;
+    --force)      FORCE=1; shift ;;
+    --base)       BASE=${2:?--base needs URL}; shift 2 ;;
+    --base=*)     BASE=${1#--base=}; shift ;;
+    *) echo "unknown arg: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
 TMP=$(mktemp -d) && cd "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -39,8 +70,12 @@ echo "Active: $ACTIVE  (label=$ACTIVE_LABEL, version=$ACTIVE_VER)"
 echo "New:    $NEW"
 
 if [[ "$NEW" == "$ACTIVE_VER" ]]; then
-  echo "Refusing to update: new version equals running version."
-  exit 1
+  if (( FORCE )); then
+    echo "Note: new == running, but --force given; continuing."
+  else
+    echo "Refusing to update: new version equals running version. Use --force to override."
+    exit 1
+  fi
 fi
 
 INACTIVE=$(lsblk -lnpo NAME,PARTLABEL "$DISK" \
@@ -53,15 +88,40 @@ echo "Inactive: $INACTIVE (partition #$PARTNUM on $DISK)"
 curl -fsSLO "$BASE/hil-runner_${NEW}.efi"
 sha256sum --ignore-missing -c <(grep "hil-runner_${NEW}.efi" SHA256SUMS)
 
+# Expected sha256 of the .xz, pulled from SHA256SUMS for post-stream verify.
+XZ_NAME="hil-runner_${NEW}.store.raw.xz"
+EXPECT=$(awk -v f="$XZ_NAME" '$2==f {print $1; exit}' SHA256SUMS)
+[[ -n "$EXPECT" ]] || { echo "no sha256 entry for $XZ_NAME"; exit 1; }
+
+if (( DRY )); then
+  echo "[dry-run] would stream $BASE/$XZ_NAME -> $INACTIVE (verify sha256=$EXPECT)"
+  echo "[dry-run] would: sfdisk --part-label $DISK $PARTNUM store_${NEW}"
+  echo "[dry-run] would: install -m0444 hil-runner_${NEW}.efi /boot/EFI/Linux/hil-runner_${NEW}.efi"
+  echo "[dry-run] done."
+  exit 0
+fi
+
 # Store image is ~2 GB compressed — too big for /tmp tmpfs. Stream it
 # straight through xz into the inactive partition, no on-disk copy.
-# We skip the .xz sha256 check (TLS protects transit, and a corrupt
-# squashfs will fail to mount on boot — at which point pick the old UKI
-# from the systemd-boot menu and retry).
+# tee branches the compressed bytes to sha256sum so we verify integrity
+# without buffering the whole .xz to disk.
 echo "Streaming store image to $INACTIVE ..."
-curl -fsSL "$BASE/hil-runner_${NEW}.store.raw.xz" \
+curl -fsSL "$BASE/$XZ_NAME" \
+  | tee >(sha256sum | awk '{print $1}' > sum.txt) \
   | xz -dc \
   | dd of="$INACTIVE" bs=4M conv=fsync status=progress
+# Wait for the tee subshell to finish flushing sum.txt.
+wait
+GOT=$(cat sum.txt)
+if [[ "$GOT" != "$EXPECT" ]]; then
+  echo "ERROR: sha256 mismatch on $XZ_NAME"
+  echo "  expected: $EXPECT"
+  echo "  got:      $GOT"
+  echo "Inactive slot ($INACTIVE) still carries its previous label — previous"
+  echo "UKI keeps booting fine. Re-run hil-update to retry."
+  exit 1
+fi
+echo "sha256 ok: $GOT"
 
 # Rename the GPT partition label so the new UKI's fileSystems entry
 # (mounted by /dev/disk/by-partlabel/store_<version>) resolves on boot.
