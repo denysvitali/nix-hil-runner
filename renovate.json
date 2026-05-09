@@ -2,5 +2,47 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "schedule": [
+    "before 06:00 on Monday"
+  ],
+  "timezone": "UTC",
+  "commitMessagePrefix": "chore(deps):",
+  "github-actions": {
+    "enabled": false
+  },
+  "nix": {
+    "enabled": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 06:00 on Monday"
+    ]
+  },
+  "packageRules": [
+    {
+      "matchManagers": [
+        "nix",
+        "custom.regex"
+      ],
+      "labels": [
+        "dependencies"
+      ]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track pftf/RPi4 UEFI firmware release pinned in modules/pi-uefi.nix",
+      "fileMatch": [
+        "^modules/pi-uefi\\.nix$"
+      ],
+      "matchStrings": [
+        "url\\s*=\\s*\"https://github\\.com/pftf/RPi4/releases/download/(?<currentValue>v[0-9.]+)/RPi4_UEFI_Firmware_[^\"]+\\.zip\";\\s*\\n\\s*hash\\s*=\\s*\"(?<currentDigest>sha256-[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "pftf/RPi4"
+    }
   ]
 }
