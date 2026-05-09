@@ -25,6 +25,11 @@ in
           InstancesMax = 2;
           Path = "auto";
           MatchPattern = "store_@v";
+          # Required by sysupdate for partition targets: tells it which GPT
+          # type to look for during auto-discovery and which type to assign
+          # when claiming a free slot. Matches image-ab.nix:46 ("linux-generic").
+          MatchPartitionType = "linux-generic";
+          PartitionType = "linux-generic";
           Type = "partition";
           ReadOnly = "yes";
         };
