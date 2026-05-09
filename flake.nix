@@ -62,5 +62,22 @@
           update-package = cfg.config.system.build.sysupdate-package;
           default = cfg.config.system.build.image;
         });
+
+      formatter = forAllSystems ({ pkgs, ... }: pkgs.nixfmt);
+
+      devShells = forAllSystems ({ pkgs, ... }: {
+        default = pkgs.mkShellNoCC {
+          packages = with pkgs; [
+            nixfmt
+            statix
+            deadnix
+            nix-output-monitor
+            shellcheck
+            gh
+            git
+            jq
+          ];
+        };
+      });
     };
 }
