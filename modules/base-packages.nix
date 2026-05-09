@@ -2,12 +2,35 @@
 { config, pkgs, ... }:
 {
   config.environment.systemPackages = with pkgs; [
-    git
+    # editors
     nano
-    htop
+    vim
+
+    # core
+    git
     curl
     wget
-    vim
     unzip
+    less
+    file
+    tree
+
+    # inspection
+    htop
+    lsof
+    jq
+
+    # hardware
+    pciutils
+    usbutils
+
+    # network
+    tcpdump
+    dnsutils
+    iperf3
+    ethtool
+
+    # sessions
+    tmux
   ];
 }
