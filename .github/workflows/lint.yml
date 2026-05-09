@@ -1,0 +1,45 @@
+name: Lint
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+
+      - name: Configure Nix substituters
+        run: |
+          mkdir -p ~/.config/nix
+          echo "extra-substituters = https://nix-community.cachix.org https://cache.nixos.org" >> ~/.config/nix/nix.conf
+          echo "extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" >> ~/.config/nix/nix.conf
+
+      - name: nix flake check
+        run: nix flake check --no-build
+
+      # statix/deadnix/nixfmt are advisory until the tree is clean. Once it is,
+      # flip continue-on-error to false so regressions block merges.
+      - name: statix
+        continue-on-error: true
+        run: nix run nixpkgs#statix -- check .
+
+      - name: deadnix
+        continue-on-error: true
+        run: nix run nixpkgs#deadnix -- --fail .
+
+      - name: nixfmt --check
+        continue-on-error: true
+        run: nix run nixpkgs#nixfmt-rfc-style -- --check .
