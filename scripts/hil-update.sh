@@ -129,6 +129,24 @@ echo "sha256 ok: $GOT"
 sfdisk --part-label "$DISK" "$PARTNUM" "store_${NEW}"
 udevadm settle
 
+# Remove any previously-staged UKIs from /boot/EFI/Linux/ before
+# installing the new one. The ESP is a fixed 256 MB partition; without
+# this the two UKI files (~30 MB each) plus BOOTAA64.EFI fill it and
+# block the install. Keep the currently-running UKI so we can still boot
+# the old slot if something goes wrong.
+INSTALL_DIR="/boot/EFI/Linux"
+# Keep the currently-running UKI so we can still boot the old slot if
+# something goes wrong. The running UKI has the active store version in
+# its name (e.g. hil-runner_2026.5.8.2333.efi).
+RUNNING_EFI="hil-runner_${ACTIVE_VER}.efi"
+shopt -s nullglob
+for f in "$INSTALL_DIR"/hil-runner_*.efi; do
+  [[ "${f##*/}" == "$RUNNING_EFI" ]] && continue
+  echo "Removing stale UKI: ${f##*/}"
+  rm -f "$f"
+done
+shopt -u nullglob
+
 install -m0444 "hil-runner_${NEW}.efi" "/boot/EFI/Linux/hil-runner_${NEW}.efi"
 
 echo "Update staged ($NEW). Reboot to switch."
