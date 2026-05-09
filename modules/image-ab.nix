@@ -22,7 +22,11 @@ in
         contents = {
           "/EFI/BOOT/BOOTAA64.EFI".source =
             "${pkgs.systemd}/lib/systemd/boot/efi/systemd-bootaa64.efi";
-          "/EFI/Linux/${config.system.boot.loader.ukiFile}".source =
+          # Install the initial UKI with the systemd-boot tries-counter suffix
+          # so the very first boot is also subject to automatic boot assessment.
+          # systemd-bless-boot strips the "+N-M" suffix once hil-boot-success
+          # marks the boot good (see modules/boot-counting.nix).
+          "/EFI/Linux/${config.boot.uki.name}_${config.system.image.version}+3-0.efi".source =
             "${config.system.build.uki}/${config.system.boot.loader.ukiFile}";
           "/loader/loader.conf".source = builtins.toFile "loader.conf" ''
             timeout 5

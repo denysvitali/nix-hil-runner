@@ -4,6 +4,7 @@
     ../../modules/image-ab.nix
     ../../modules/uki-boot.nix
     ../../modules/sysupdate.nix
+    ../../modules/boot-counting.nix
     ../../modules/pi-uefi.nix
 
     ../../modules/perm.nix

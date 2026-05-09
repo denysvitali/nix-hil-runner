@@ -42,11 +42,18 @@ in
         };
         Target = {
           InstancesMax = 2;
-          MatchPattern = [ "${config.boot.uki.name}_@v.efi" ];
+          # @l/@d are the systemd-boot tries-left / tries-done counters. With
+          # this pattern, sysupdate writes new UKIs as "<name>_<ver>+3-0.efi";
+          # systemd-boot decrements TriesLeft on each boot attempt and once
+          # systemd-bless-boot.service runs (gated on hil-boot-success — see
+          # modules/boot-counting.nix) the suffix is stripped to mark "good".
+          MatchPattern = [ "${config.boot.uki.name}_@v+@l-@d.efi" "${config.boot.uki.name}_@v.efi" ];
           Mode = "0444";
           Path = "/EFI/Linux";
           PathRelativeTo = "boot";
           Type = "regular-file";
+          TriesLeft = 3;
+          TriesDone = 0;
         };
         Transfer.Verify = "no";
       };

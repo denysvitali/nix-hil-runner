@@ -61,12 +61,21 @@ mapfile -t UKIS < <(
 # Snapshot store_* partlabels once for sanity-checking.
 STORE_LABELS=$(lsblk -no PARTLABEL 2>/dev/null | grep -E '^store_' || true)
 
+# systemd-boot tries-counter suffix: "<ver>+TRIES_LEFT-TRIES_DONE" or "<ver>+TRIES_LEFT".
+# Strip it so we can match the version against store_<ver> partlabels.
+strip_counter() {
+  local v=$1
+  v=${v%%+*}
+  printf '%s' "$v"
+}
+
 print_list() {
   local i name ver mark store_ok
   for i in "${!UKIS[@]}"; do
     name=${UKIS[$i]}
     ver=${name#${UKI_PREFIX}_}
     ver=${ver%.efi}
+    ver=$(strip_counter "$ver")
     mark=" "
     [[ "$ver" == "$ACTIVE_VER" ]] && mark="*"
     if grep -qx "store_${ver}" <<<"$STORE_LABELS"; then
@@ -89,6 +98,7 @@ fi
 DEFAULT_IDX=0
 for i in "${!UKIS[@]}"; do
   ver=${UKIS[$i]#${UKI_PREFIX}_}; ver=${ver%.efi}
+  ver=$(strip_counter "$ver")
   if [[ "$ver" != "$ACTIVE_VER" ]]; then
     DEFAULT_IDX=$i
     break
@@ -107,6 +117,7 @@ fi
 
 PICK=${UKIS[$CHOICE]}
 PICK_VER=${PICK#${UKI_PREFIX}_}; PICK_VER=${PICK_VER%.efi}
+PICK_VER=$(strip_counter "$PICK_VER")
 
 if [[ "$PICK_VER" == "$ACTIVE_VER" ]]; then
   echo "WARNING: selected UKI matches the currently running version ($PICK_VER)."
