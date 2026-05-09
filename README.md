@@ -14,11 +14,14 @@ artifact for every device.
 3. **`hil-setup`** (run as root) prompts for:
    - hostname
    - SSH authorized keys (paste, or `gh:<username>` to fetch from GitHub)
+   - optional console root password (serial/HDMI fallback; SSH stays key-only)
    - GitHub runner repo URL, name, labels, and registration token
 
    All values are written to `/perm/` and the device reboots.
 4. **Subsequent boots — hardened mode.** Because `/perm/configured` exists:
-   - root password is locked, password auth is disabled
+   - SSH password auth is disabled (key-only)
+   - root account is locked unless `/perm/root.hash` is set, in which case
+     that hash is restored at boot for console-only access
    - SSH keys are synced from `/perm/authorized_keys`
    - hostname is set from `/perm/hostname`
    - the runner is registered (using `/perm/runner.{env,token}`) and started

@@ -2,7 +2,7 @@
 let
   setupScript = pkgs.writeShellApplication {
     name = "hil-setup";
-    runtimeInputs = with pkgs; [ curl coreutils gnused systemd ];
+    runtimeInputs = with pkgs; [ curl coreutils gnused systemd mkpasswd ];
     text = ''
       set -euo pipefail
 
@@ -127,6 +127,28 @@ let
         runner_labels=$(printf '%s' "$runner_labels" | sed -E 's/[[:space:]]*,[[:space:]]*/,/g; s/^[[:space:]]+//; s/[[:space:]]+$//')
       }
 
+      prompt_root_password() {
+        # Console-only password for root. SSH password auth stays off in
+        # hardened mode; this is purely a serial/HDMI fallback. Empty input
+        # keeps the account locked (the default).
+        while true; do
+          read -r -s -p "Console root password (empty = keep locked, no console login): " p1 || true
+          echo
+          if [ -z "$p1" ]; then
+            root_hash=""
+            return
+          fi
+          read -r -s -p "Confirm password: " p2 || true
+          echo
+          if [ "$p1" != "$p2" ]; then
+            echo "  passwords do not match; try again"
+            continue
+          fi
+          root_hash=$(printf '%s' "$p1" | mkpasswd -m sha-512 -s)
+          return
+        done
+      }
+
       prompt_runner_token() {
         while true; do
           read -r -s -p "Runner registration token (input hidden): " runner_token || true
@@ -143,6 +165,8 @@ let
       prompt_hostname
       prompt_keys
       echo
+      prompt_root_password
+      echo
       prompt_runner_url
       prompt_runner_name
       prompt_runner_labels
@@ -153,29 +177,32 @@ let
         echo "=== Summary ==="
         echo "  1) hostname: $hostname"
         echo "  2) keys:     $(printf '%s\n' "$keys" | wc -l) line(s)"
-        echo "  3) url:      $runner_url"
-        echo "  4) name:     $runner_name"
-        echo "  5) labels:   $runner_labels"
-        echo "  6) token:    (hidden, $(printf '%s' "$runner_token" | wc -c) chars)"
+        echo "  3) root pw:  $([ -n "$root_hash" ] && echo set || echo "(locked)")"
+        echo "  4) url:      $runner_url"
+        echo "  5) name:     $runner_name"
+        echo "  6) labels:   $runner_labels"
+        echo "  7) token:    (hidden, $(printf '%s' "$runner_token" | wc -c) chars)"
         echo
         read -r -p "Write to /perm and reboot? [y/N/edit number]: " confirm || true
         case "$confirm" in
           y|Y|yes|YES) break ;;
           1) prompt_hostname ;;
           2) prompt_keys ;;
-          3) prompt_runner_url ;;
-          4) prompt_runner_name ;;
-          5) prompt_runner_labels ;;
-          6) prompt_runner_token ;;
+          3) prompt_root_password ;;
+          4) prompt_runner_url ;;
+          5) prompt_runner_name ;;
+          6) prompt_runner_labels ;;
+          7) prompt_runner_token ;;
           n|N|no|NO|"")
-            read -r -p "Edit which field? [1-6, or 'q' to abort]: " sel || true
+            read -r -p "Edit which field? [1-7, or 'q' to abort]: " sel || true
             case "$sel" in
               1) prompt_hostname ;;
               2) prompt_keys ;;
-              3) prompt_runner_url ;;
-              4) prompt_runner_name ;;
-              5) prompt_runner_labels ;;
-              6) prompt_runner_token ;;
+              3) prompt_root_password ;;
+              4) prompt_runner_url ;;
+              5) prompt_runner_name ;;
+              6) prompt_runner_labels ;;
+              7) prompt_runner_token ;;
               q|Q) echo "aborted"; exit 1 ;;
               *) echo "  (unknown selection)" ;;
             esac
@@ -188,6 +215,12 @@ let
       printf '%s\n' "$hostname"      > "$PERM/hostname"
       printf '%s\n' "$keys"          > "$PERM/authorized_keys"
       printf '%s'   "$runner_token"  > "$PERM/runner.token"
+      if [ -n "$root_hash" ]; then
+        printf '%s\n' "$root_hash" > "$PERM/root.hash"
+        chmod 0600 "$PERM/root.hash"
+      else
+        rm -f "$PERM/root.hash"
+      fi
       cat > "$PERM/runner.env" <<EOF
       URL=$runner_url
       NAME=$runner_name

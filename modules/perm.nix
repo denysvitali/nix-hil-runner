@@ -44,7 +44,17 @@
         ${pkgs.systemd}/bin/hostnamectl --transient set-hostname "$hostname"
       fi
 
-      echo "synced $key_count keys for users $(echo $users | tr ' ' ','); hostname=''${hostname:-<unset>}"
+      # Console root password. hil-firstboot locks root unconditionally in the
+      # hardened branch; if /perm/root.hash exists we re-enable it here so SSH
+      # password auth stays off (no sshd drop-in) but a serial/HDMI login works.
+      root_pw="locked"
+      if [ -s /perm/root.hash ]; then
+        printf 'root:%s\n' "$(cat /perm/root.hash)" \
+          | ${pkgs.shadow}/bin/chpasswd -e
+        root_pw="set"
+      fi
+
+      echo "synced $key_count keys for users $(echo $users | tr ' ' ','); hostname=''${hostname:-<unset>}; root_pw=$root_pw"
     '';
   };
 
@@ -52,7 +62,7 @@
     description = "Watch /perm/{authorized_keys,hostname} and re-trigger hil-perm-sync";
     wantedBy = [ "multi-user.target" ];
     pathConfig = {
-      PathChanged = [ "/perm/authorized_keys" "/perm/hostname" ];
+      PathChanged = [ "/perm/authorized_keys" "/perm/hostname" "/perm/root.hash" ];
       Unit = "hil-perm-sync.service";
     };
   };

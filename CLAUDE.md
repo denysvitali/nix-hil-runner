@@ -21,8 +21,10 @@ nix flake check --no-build
   - `/etc/motd` shows setup banner
   - User runs `hil-setup` (interactive), which writes `/perm/*` and reboots
 - `/perm/configured` present → **hardened mode**
-  - root password locked, sshd drop-in removed
-  - `hil-perm-sync` syncs keys + hostname from `/perm`
+  - sshd drop-in removed (SSH password auth off, key-only)
+  - root password locked by `hil-firstboot`, then re-set by `hil-perm-sync`
+    from `/perm/root.hash` if present (console-only fallback)
+  - `hil-perm-sync` syncs keys + hostname + root password hash from `/perm`
   - `hil-runner.service` registers the runner and starts it
 
 ## Module map
@@ -56,6 +58,7 @@ at runtime works without conflicts.
 - `configured`        — marker file
 - `hostname`          — one line
 - `authorized_keys`   — synced to `/etc/ssh/authorized_keys.d/{root,hil}`
+- `root.hash`         — optional SHA-512 crypt hash; sets the console root password
 - `runner.token`      — registration token (read by runner unit at start)
 - `runner.env`        — `URL=`, `NAME=`, `LABELS=`
 
@@ -64,6 +67,11 @@ at runtime works without conflicts.
 ```bash
 sudoedit /perm/authorized_keys && sudo systemctl restart hil-perm-sync
 sudoedit /perm/runner.token    && sudo systemctl restart hil-runner
+
+# set/replace the console root password:
+mkpasswd -m sha-512 | sudo tee /perm/root.hash >/dev/null
+sudo chmod 0600 /perm/root.hash
+sudo systemctl restart hil-perm-sync
 ```
 
 ## Build outputs
