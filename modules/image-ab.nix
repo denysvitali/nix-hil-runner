@@ -108,6 +108,12 @@ in
       fsType = "vfat";
       options = [ "umask=0077" ];
     };
+    "/nix/store/.links" = {
+      device = "tmpfs";
+      fsType = "tmpfs";
+      neededForBoot = true;
+      options = [ "mode=0755" ];
+    };
     "/perm" = {
       device = "/dev/disk/by-partlabel/perm";
       fsType = "ext4";
