@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ lib, ... }:
 {
   services.openssh = {
     enable = true;
@@ -9,14 +9,16 @@
     authorizedKeysFiles = lib.mkForce [ "/etc/ssh/authorized_keys.d/%u" ];
   };
 
-  users.mutableUsers = true;
+  users = {
+    mutableUsers = true;
 
-  users.users.root.initialPassword = lib.mkDefault "root";
+    users.root.initialPassword = lib.mkDefault "root";
 
-  users.users.hil = {
-    isNormalUser = true;
-    description = "HIL runner user";
-    extraGroups = [ "wheel" "networkmanager" "plugdev" "dialout" ];
+    users.hil = {
+      isNormalUser = true;
+      description = "HIL runner user";
+      extraGroups = [ "wheel" "networkmanager" "plugdev" "dialout" ];
+    };
   };
 
   security.sudo.wheelNeedsPassword = false;
