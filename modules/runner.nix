@@ -74,6 +74,24 @@ in
       Restart = "on-failure";
       RestartSec = 5;
       PrivateDevices = false;
+
+      # Conservative systemd hardening — does not sandbox USB/devices since probe-rs needs them.
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      ReadWritePaths = [ workDir ];
+      ReadOnlyPaths = [ "/perm" ];
+      PrivateTmp = true;
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      RestrictNamespaces = true;
+      LockPersonality = true;
+      RestrictRealtime = true;
+      RestrictSUIDSGID = true;
+      ProtectClock = true;
+      ProtectHostname = true;
     };
   };
 }
