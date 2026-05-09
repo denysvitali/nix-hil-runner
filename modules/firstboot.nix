@@ -58,6 +58,29 @@ let
   sshdDropinFile = pkgs.writeText "sshd-firstboot.conf" sshdDropinContent;
   motdFile = pkgs.writeText "motd-firstboot" motdFirstBoot;
 
+  # Writes /etc/motd with the static first-boot banner plus any globally-routed
+  # IPv4/IPv6 addresses currently visible. Idempotent and safe to call any time.
+  motdScript = pkgs.writeShellScript "hil-firstboot-motd" ''
+    set -eu
+    ips=$(${pkgs.iproute2}/bin/ip -o -4 addr show scope global \
+        | ${pkgs.gawk}/bin/awk '{print $2": "$4}' | sort -u || true)
+    ips6=$(${pkgs.iproute2}/bin/ip -o -6 addr show scope global \
+        | ${pkgs.gawk}/bin/awk '{print $2": "$4}' | sort -u || true)
+    {
+      cat ${motdFile}
+      printf '\n  Detected addresses:\n'
+      if [ -n "$ips" ]; then
+        printf '%s\n' "$ips" | sed 's/^/    /'
+      fi
+      if [ -n "$ips6" ]; then
+        printf '%s\n' "$ips6" | sed 's/^/    /'
+      fi
+      if [ -z "$ips$ips6" ]; then
+        printf '    (no global addresses yet — check `nmcli device status`)\n'
+      fi
+    } > /etc/motd
+  '';
+
   firstbootScript = pkgs.writeShellScript "hil-firstboot" ''
     set -eu
     install -d -m 0755 /perm
@@ -67,6 +90,8 @@ let
       echo "FIRST BOOT: enabling password auth + root login"
       echo 'root:root' | ${pkgs.shadow}/bin/chpasswd
       install -m 0644 ${sshdDropinFile} ${sshdDropin}
+      # Seed /etc/motd with the static banner; hil-firstboot-motd.service will
+      # rewrite it once network-online.target is reached so detected IPs show.
       install -m 0644 ${motdFile} /etc/motd
       ${pkgs.systemd}/bin/systemctl daemon-reload
     else
@@ -90,6 +115,21 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
       ExecStart = "${firstbootScript}";
+    };
+  };
+
+  # Separate unit so we can wait for network-online.target without delaying
+  # sshd / the password+drop-in toggle above. Only runs in first-boot mode.
+  systemd.services.hil-firstboot-motd = {
+    description = "Render first-boot MOTD with detected IP addresses";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" "hil-firstboot.service" ];
+    unitConfig.ConditionPathExists = "!/perm/configured";
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${motdScript}";
     };
   };
 }
