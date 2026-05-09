@@ -66,6 +66,46 @@ hil-setup                # follow the prompts
 
 To return to first-boot mode: `sudo rm /perm/configured && sudo reboot`.
 
+## Updating an already-flashed device
+
+`scripts/hil-update.sh` is the manual bridge until `systemd-sysupdate` is wired
+up everywhere. It pulls the latest store image and UKI from the rolling
+`updates` GitHub release, streams the xz-compressed store into the inactive
+A/B slot, relabels its GPT partition (`store_<version>`), and drops the new
+UKI alongside the existing one in `/boot/EFI/Linux`. The old slot stays
+intact for rollback; reboot to switch — systemd-boot defaults to the newest
+UKI.
+
+One-liner (needs `sudo`; otherwise non-interactive):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/denysvitali/nix-hil-runner/master/scripts/hil-update.sh \
+  | sudo bash
+```
+
+Or save and run:
+
+```bash
+wget https://raw.githubusercontent.com/denysvitali/nix-hil-runner/master/scripts/hil-update.sh
+chmod +x hil-update.sh
+sudo ./hil-update.sh
+```
+
+Use this when `updatectl`/sysupdate isn't yet active on the device. Once
+sysupdate is wired in (see below), prefer that path.
+
+## Rollback
+
+`scripts/hil-rollback.sh` flips the next boot to the other UKI without
+touching the default. It uses `bootctl set-oneshot` so the change applies to
+exactly one boot; pass `--persistent` to make it sticky.
+
+```bash
+sudo scripts/hil-rollback.sh --list      # show available UKIs / slots
+sudo scripts/hil-rollback.sh             # one-shot rollback on next boot
+sudo reboot
+```
+
 ## OTA updates
 
 `systemd-sysupdate` swaps the inactive nix-store partition and the UKI
@@ -122,9 +162,37 @@ sudoedit /perm/runner.token
 sudo systemctl restart hil-runner.service
 ```
 
+## Troubleshooting
+
+- **Setup wizard can't be reached.** Attach a serial console or plug in
+  wired ethernet; check link/DHCP with `nmcli device status`.
+- **Runner not connecting.** Inspect `journalctl -u hil-runner` and
+  `cat /perm/runner.env`. Re-enter the registration token with:
+  ```bash
+  sudoedit /perm/runner.token
+  sudo systemctl restart hil-runner
+  ```
+- **After OTA, `/nix/store` mount fails.** From the systemd-boot menu pick
+  the previous UKI to boot back into the old slot, then make it sticky:
+  ```bash
+  sudo scripts/hil-rollback.sh --persistent
+  ```
+- **Stuck in first-boot mode.** Confirm the marker file is present:
+  ```bash
+  ls -la /perm/
+  ```
+  If `/perm/configured` is missing, re-run `hil-setup` (or `sudo touch
+  /perm/configured` once the rest of `/perm` is populated) and reboot.
+
+## Contributing
+
+Contributions welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the
+development workflow, build/test expectations, and commit conventions.
+
 ## Caveats
 
-This image has not been booted on real hardware yet. Likely iteration points:
+Real-hardware coverage is still limited; expect rough edges. Likely
+iteration points:
 
 - exact pftf payload layout staged on the ESP
 - `sysupdate.nix` `Path` URL — currently a GitHub Releases pattern; adjust
