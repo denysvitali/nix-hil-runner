@@ -67,6 +67,7 @@ in
       Environment = [
         "USER=github-runner"
         "HOME=${workDir}"
+        "RUNNER_ROOT=${workDir}"
       ];
       ExecStartPre = "${configureScript}";
       ExecStart = "${runner}/bin/run.sh";
