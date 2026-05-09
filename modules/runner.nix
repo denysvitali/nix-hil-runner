@@ -22,6 +22,25 @@ let
   '';
 in
 {
+  # Many GitHub Actions install generic dynamically-linked binaries
+  # (e.g. AWS CLI's `aws/dist/aws`) directly into the runner's workspace.
+  # nix-ld provides a working dynamic linker plus a default library path so
+  # those binaries run without bespoke wrapping.
+  programs.nix-ld = {
+    enable = true;
+    libraries = with pkgs; [
+      stdenv.cc.cc.lib
+      zlib
+      openssl
+      curl
+      glib
+      libxml2
+      libxcrypt-legacy
+      icu
+      util-linux
+    ];
+  };
+
   users.groups.github-runner = { };
   users.users.github-runner = {
     isSystemUser = true;
