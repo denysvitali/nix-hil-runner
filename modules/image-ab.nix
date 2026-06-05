@@ -1,4 +1,10 @@
-{ config, lib, pkgs, modulesPath, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  modulesPath,
+  ...
+}:
 let
   storeSize = "3G";
 in
@@ -20,8 +26,7 @@ in
     partitions = {
       "10-esp" = {
         contents = {
-          "/EFI/BOOT/BOOTAA64.EFI".source =
-            "${pkgs.systemd}/lib/systemd/boot/efi/systemd-bootaa64.efi";
+          "/EFI/BOOT/BOOTAA64.EFI".source = "${pkgs.systemd}/lib/systemd/boot/efi/systemd-bootaa64.efi";
           # Install the initial UKI with the systemd-boot tries-counter suffix
           # so the very first boot is also subject to automatic boot assessment.
           # systemd-bless-boot strips the "+N-M" suffix once hil-boot-success

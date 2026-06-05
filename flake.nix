@@ -16,26 +16,37 @@
     ];
   };
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
       # Version is injected at build time by writing ./VERSION (CI does this
       # from the computed tag). Local builds without a VERSION file get "dev".
-      version =
-        if builtins.pathExists ./VERSION
-        then nixpkgs.lib.fileContents ./VERSION
-        else "dev";
-      versionModule = { system.image.version = version; };
-      systems = [ "x86_64-linux" "aarch64-linux" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f {
-        inherit system;
-        pkgs = nixpkgs.legacyPackages.${system};
-      });
+      version = if builtins.pathExists ./VERSION then nixpkgs.lib.fileContents ./VERSION else "dev";
+      versionModule = {
+        system.image.version = version;
+      };
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      forAllSystems =
+        f:
+        nixpkgs.lib.genAttrs systems (
+          system:
+          f {
+            inherit system;
+            pkgs = nixpkgs.legacyPackages.${system};
+          }
+        );
     in
     {
       nixosConfigurations = {
         pi4 = nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
-          modules = [ versionModule ./hosts/pi4/configuration.nix ];
+          modules = [
+            versionModule
+            ./hosts/pi4/configuration.nix
+          ];
         };
 
         pi4-cross = nixpkgs.lib.nixosSystem {
@@ -51,33 +62,39 @@
         };
       };
 
-      packages = forAllSystems ({ system, pkgs }:
+      packages = forAllSystems (
+        { system, ... }:
         let
-          cfg = if system == "aarch64-linux"
-            then self.nixosConfigurations.pi4
-            else self.nixosConfigurations.pi4-cross;
+          cfg =
+            if system == "aarch64-linux" then
+              self.nixosConfigurations.pi4
+            else
+              self.nixosConfigurations.pi4-cross;
         in
         {
           image = cfg.config.system.build.image;
           update-package = cfg.config.system.build.sysupdate-package;
           default = cfg.config.system.build.image;
-        });
+        }
+      );
 
       formatter = forAllSystems ({ pkgs, ... }: pkgs.nixfmt);
 
-      devShells = forAllSystems ({ pkgs, ... }: {
-        default = pkgs.mkShellNoCC {
-          packages = with pkgs; [
-            nixfmt
-            statix
-            deadnix
-            nix-output-monitor
-            shellcheck
-            gh
-            git
-            jq
-          ];
-        };
-      });
+      devShells = forAllSystems (
+        { pkgs, ... }: {
+          default = pkgs.mkShellNoCC {
+            packages = with pkgs; [
+              nixfmt
+              statix
+              deadnix
+              nix-output-monitor
+              shellcheck
+              gh
+              git
+              jq
+            ];
+          };
+        }
+      );
     };
 }

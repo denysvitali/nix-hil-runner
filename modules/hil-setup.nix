@@ -1,8 +1,17 @@
-{ config, lib, pkgs, ... }:
+{
+  pkgs,
+  ...
+}:
 let
   setupScript = pkgs.writeShellApplication {
     name = "hil-setup";
-    runtimeInputs = with pkgs; [ curl coreutils gnused systemd mkpasswd ];
+    runtimeInputs = with pkgs; [
+      curl
+      coreutils
+      gnused
+      systemd
+      mkpasswd
+    ];
     text = ''
       set -euo pipefail
 

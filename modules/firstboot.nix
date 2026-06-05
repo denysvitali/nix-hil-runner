@@ -1,4 +1,7 @@
-{ config, lib, pkgs, ... }:
+{
+  pkgs,
+  ...
+}:
 let
   # NixOS makes /etc/systemd/system a read-only symlink into the Nix store, so
   # runtime drop-ins have to live under /run/systemd/system. systemd reads
@@ -124,7 +127,10 @@ in
     description = "Render first-boot MOTD with detected IP addresses";
     wantedBy = [ "multi-user.target" ];
     wants = [ "network-online.target" ];
-    after = [ "network-online.target" "hil-firstboot.service" ];
+    after = [
+      "network-online.target"
+      "hil-firstboot.service"
+    ];
     unitConfig.ConditionPathExists = "!/perm/configured";
     serviceConfig = {
       Type = "oneshot";

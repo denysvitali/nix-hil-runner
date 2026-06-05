@@ -1,4 +1,7 @@
-{ config, lib, pkgs, ... }:
+{
+  pkgs,
+  ...
+}:
 let
   # pftf provides a UEFI firmware build for the Raspberry Pi 4.
   # The Pi GPU loads start4.elf -> RPI_EFI.fd; UEFI then chains to

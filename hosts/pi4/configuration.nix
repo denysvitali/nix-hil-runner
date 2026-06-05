@@ -1,4 +1,7 @@
-{ config, pkgs, lib, ... }:
+{
+  lib,
+  ...
+}:
 {
   imports = [
     ../../modules/image-ab.nix
@@ -28,16 +31,26 @@
     (_: prev: {
       systemd = prev.systemd.overrideAttrs (old: {
         nativeBuildInputs = [
-          (prev.buildPackages.python3.withPackages (ps: with ps; [
-            lxml markupsafe jinja2 pyelftools pefile
-          ]))
-        ] ++ (old.nativeBuildInputs or []);
+          (prev.buildPackages.python3.withPackages (
+            ps: with ps; [
+              lxml
+              markupsafe
+              jinja2
+              pyelftools
+              pefile
+            ]
+          ))
+        ]
+        ++ (old.nativeBuildInputs or [ ]);
       });
     })
   ];
 
   nix.settings = {
-    experimental-features = [ "nix-command" "flakes" ];
+    experimental-features = [
+      "nix-command"
+      "flakes"
+    ];
     max-jobs = lib.mkDefault 4;
   };
 

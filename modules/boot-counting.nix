@@ -1,4 +1,7 @@
-{ config, lib, pkgs, ... }:
+{
+  pkgs,
+  ...
+}:
 let
   # Gate for systemd-bless-boot.service. Determines whether the current boot
   # was "good enough" to strip the boot-counter suffix from the running UKI.

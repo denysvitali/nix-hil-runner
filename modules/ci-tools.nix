@@ -1,5 +1,8 @@
 # CI/Embedded Development Tools
-{ config, pkgs, lib, ... }:
+{
+  pkgs,
+  ...
+}:
 {
   config.environment.systemPackages = with pkgs; [
     # Embedded development tools

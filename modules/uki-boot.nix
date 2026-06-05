@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = false;
@@ -17,13 +22,23 @@
   boot.initrd = {
     includeDefaultModules = false;
     availableKernelModules = [
-      "mmc_block" "sdhci_iproc"                 # SD card boot
-      "pcie_brcmstb" "reset-raspberrypi"        # PCIe + vl805 reset (USB boot)
-      "xhci_pci" "usb_storage" "usbhid" "hid_generic"
-      "ext4" "squashfs" "vfat"
+      "mmc_block"
+      "sdhci_iproc" # SD card boot
+      "pcie_brcmstb"
+      "reset-raspberrypi" # PCIe + vl805 reset (USB boot)
+      "xhci_pci"
+      "usb_storage"
+      "usbhid"
+      "hid_generic"
+      "ext4"
+      "squashfs"
+      "vfat"
     ];
     compressor = "zstd";
-    compressorArgs = [ "-19" "-T0" ];
+    compressorArgs = [
+      "-19"
+      "-T0"
+    ];
   };
 
   boot.kernelParams = [

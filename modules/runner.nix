@@ -1,4 +1,7 @@
-{ config, lib, pkgs, ... }:
+{
+  pkgs,
+  ...
+}:
 let
   workDir = "/var/lib/github-runner";
   runner = pkgs.github-runner;
@@ -47,7 +50,10 @@ in
     group = "github-runner";
     home = workDir;
     createHome = false;
-    extraGroups = [ "plugdev" "dialout" ];
+    extraGroups = [
+      "plugdev"
+      "dialout"
+    ];
   };
 
   systemd.tmpfiles.rules = [
@@ -81,7 +87,10 @@ in
       User = "github-runner";
       Group = "github-runner";
       WorkingDirectory = workDir;
-      SupplementaryGroups = [ "plugdev" "dialout" ];
+      SupplementaryGroups = [
+        "plugdev"
+        "dialout"
+      ];
       EnvironmentFile = "/perm/runner.env";
       Environment = [
         "USER=github-runner"

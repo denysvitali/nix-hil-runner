@@ -17,7 +17,12 @@
     users.hil = {
       isNormalUser = true;
       description = "HIL runner user";
-      extraGroups = [ "wheel" "networkmanager" "plugdev" "dialout" ];
+      extraGroups = [
+        "wheel"
+        "networkmanager"
+        "plugdev"
+        "dialout"
+      ];
     };
   };
 

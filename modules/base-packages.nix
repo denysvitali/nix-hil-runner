@@ -1,5 +1,5 @@
 # Base system packages
-{ config, pkgs, ... }:
+{ pkgs, ... }:
 {
   config.environment.systemPackages = with pkgs; [
     # editors

@@ -1,4 +1,7 @@
-{ config, lib, pkgs, ... }:
+{
+  pkgs,
+  ...
+}:
 {
   # /perm is the persistent layer. For now it's a directory on the rootfs
   # (Stage 2 will promote it to a dedicated partition that survives reflash).
@@ -10,8 +13,14 @@
   systemd.services.hil-perm-sync = {
     description = "Sync /perm runtime config into runtime locations";
     wantedBy = [ "multi-user.target" ];
-    before = [ "sshd.service" "hil-runner.service" ];
-    after = [ "hil-firstboot.service" "local-fs.target" ];
+    before = [
+      "sshd.service"
+      "hil-runner.service"
+    ];
+    after = [
+      "hil-firstboot.service"
+      "local-fs.target"
+    ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
@@ -62,7 +71,11 @@
     description = "Watch /perm/{authorized_keys,hostname} and re-trigger hil-perm-sync";
     wantedBy = [ "multi-user.target" ];
     pathConfig = {
-      PathChanged = [ "/perm/authorized_keys" "/perm/hostname" "/perm/root.hash" ];
+      PathChanged = [
+        "/perm/authorized_keys"
+        "/perm/hostname"
+        "/perm/root.hash"
+      ];
       Unit = "hil-perm-sync.service";
     };
   };
