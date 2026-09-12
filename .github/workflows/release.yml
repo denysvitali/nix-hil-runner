@@ -31,7 +31,7 @@ jobs:
       - name: Allow unprivileged user namespaces
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
-      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: DeterminateSystems/nix-installer-action@v23
         with:
           # cache-nix-action requires these to keep build deps reachable via
           # GC roots, otherwise the saved store is missing intermediate paths.
